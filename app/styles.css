@@ -850,3 +850,40 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 5px; }
   overflow-y: auto;
 }
 .upd-notes:empty { display: none; }
+
+/* ============================ twitch sign-in ============================ */
+
+.signin[hidden] { display: none; }
+
+.btn-lg { padding: 12px 18px; font-size: 14px; }
+
+.hint-sm { font-size: 11.5px; margin: 10px 0 0; }
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: linear-gradient(100deg, rgba(0,229,192,.08), rgba(0,229,192,.02));
+  border: 1px solid rgba(0,229,192,.28);
+  margin-bottom: 12px;
+}
+
+.acct-avatar {
+  width: 38px; height: 38px;
+  border-radius: 99px;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 16px; color: #fff;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+}
+
+.acct-main { min-width: 0; flex: 1; }
+.acct-name {
+  font-size: 14px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.acct-sub { font-size: 11.5px; color: #6cf0da; margin-top: 2px; }
+
+.howto p.hint { margin: 8px 0 10px; }

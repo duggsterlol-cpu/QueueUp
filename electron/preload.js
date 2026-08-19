@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('hq', {
 
   connect: () => ipcRenderer.invoke('twitch:connect'),
   disconnect: () => ipcRenderer.invoke('twitch:disconnect'),
-  login: clientId => ipcRenderer.invoke('twitch:login', clientId),
+  login: () => ipcRenderer.invoke('twitch:login'),
   logout: () => ipcRenderer.invoke('twitch:logout'),
 
   copy: text => ipcRenderer.invoke('util:copy', text),

@@ -5,6 +5,7 @@ const { Store, formatQueueMessage } = require('./state');
 const { TwitchChat } = require('./twitch');
 const { createServer } = require('./server');
 const { createUpdater } = require('./updater');
+const twitchApp = require('./twitch-app');
 
 const isDev = !app.isPackaged;
 let win = null;
@@ -71,8 +72,8 @@ function createWindow() {
 /* --------------------------------------------------------------------- */
 
 async function fetchAvatars(logins) {
-  const { clientId, accessToken } = store.data.settings;
-  if (!clientId || !accessToken) return;
+  const { accessToken } = store.data.settings;
+  if (!accessToken || !twitchApp.configured()) return;
   const wanted = [...new Set(logins.map(l => l.toLowerCase()))]
     .filter(l => l && !avatarCache.has(l))
     .slice(0, 100);
@@ -81,7 +82,7 @@ async function fetchAvatars(logins) {
   try {
     const qs = wanted.map(l => 'login=' + encodeURIComponent(l)).join('&');
     const res = await fetch('https://api.twitch.tv/helix/users?' + qs, {
-      headers: { 'Client-Id': clientId, Authorization: 'Bearer ' + accessToken }
+      headers: { 'Client-Id': twitchApp.TWITCH_CLIENT_ID, Authorization: 'Bearer ' + accessToken }
     });
     if (!res.ok) return;
     const json = await res.json();
@@ -185,9 +186,11 @@ async function boot() {
     onAuth: token => validateAndStoreToken(token)
   });
 
-  const wanted = Number(store.data.settings.port) || 4747;
+  // Preferred port first, then the rest of the OAuth-registered ports.
+  const wanted = Number(store.data.settings.port) || twitchApp.REDIRECT_PORTS[0];
+  const candidates = [wanted, ...twitchApp.REDIRECT_PORTS.filter(p => p !== wanted)];
   try {
-    await server.listen(wanted);
+    await server.listen(candidates);
     pushLog({ type: 'info', text: `Overlay server running on http://localhost:${server.port}` });
   } catch (err) {
     pushLog({ type: 'error', text: 'Could not start the overlay server: ' + err.message });
@@ -224,6 +227,25 @@ async function boot() {
   if (store.data.settings.autoUpdate !== false) {
     setTimeout(() => updater.check(false), 4000);
   }
+
+  if (store.data.settings.accessToken) setTimeout(() => revalidateToken(), 1500);
+}
+
+/** Twitch tokens expire (~60 days). Catch that on launch rather than mid-stream. */
+async function revalidateToken() {
+  const token = store.data.settings.accessToken;
+  if (!token) return;
+  try {
+    const res = await fetch('https://id.twitch.tv/oauth2/validate', {
+      headers: { Authorization: 'OAuth ' + token }
+    });
+    if (res.ok) return;
+    store.updateSettings({ accessToken: '', botReplies: false });
+    pushLog({ type: 'warn', text: 'Your Twitch sign-in expired - sign in again to chat from your account.' });
+    send('auth', { ok: false, reason: 'expired' });
+  } catch (_) {
+    // Offline: keep the token and try again next launch.
+  }
 }
 
 function connectChat() {
@@ -245,11 +267,11 @@ async function validateAndStoreToken(token) {
       return;
     }
     const info = await res.json();
+    // Signing in tells us who they are, so the channel no longer has to be typed.
     store.updateSettings({
       accessToken: token,
       botUsername: info.login,
-      clientId: info.client_id,
-      channel: store.data.settings.channel || info.login,
+      channel: info.login,
       botReplies: true
     });
     pushLog({ type: 'info', text: `Signed in to Twitch as ${info.login}` });
@@ -269,6 +291,12 @@ function fullState() {
     ...store.snapshot(),
     port: server ? server.port : null,
     version: app.getVersion(),
+    auth: {
+      configured: twitchApp.configured(),
+      signedIn: !!store.data.settings.accessToken,
+      login: store.data.settings.botUsername || '',
+      portOk: server ? twitchApp.isRegisteredPort(server.port) : false
+    },
     update: updater ? updater.state : null,
     twitch: chat.state,
     overlayClients: server ? server.clientCount : 0
@@ -319,21 +347,15 @@ ipcMain.handle('overlay:reset', () => store.resetOverlay());
 ipcMain.handle('twitch:connect', () => { connectChat(); return chat.state; });
 ipcMain.handle('twitch:disconnect', () => { chat.disconnect(); return chat.state; });
 
-ipcMain.handle('twitch:login', (_e, clientId) => {
-  const id = String(clientId || store.data.settings.clientId || '').trim();
-  if (!id) return { ok: false, reason: 'no_client_id' };
-  store.updateSettings({ clientId: id });
-  const redirect = `http://localhost:${server.port}/auth/callback`;
-  const scopes = ['chat:read', 'chat:edit'].join(' ');
-  const url =
-    'https://id.twitch.tv/oauth2/authorize' +
-    `?client_id=${encodeURIComponent(id)}` +
-    `&redirect_uri=${encodeURIComponent(redirect)}` +
-    '&response_type=token' +
-    `&scope=${encodeURIComponent(scopes)}` +
-    '&force_verify=true';
-  shell.openExternal(url);
-  return { ok: true, redirect };
+ipcMain.handle('twitch:login', () => {
+  if (!twitchApp.configured()) {
+    return { ok: false, reason: 'not_configured' };
+  }
+  if (!twitchApp.isRegisteredPort(server.port)) {
+    return { ok: false, reason: 'bad_port', port: server.port };
+  }
+  shell.openExternal(twitchApp.authorizeUrl(server.port));
+  return { ok: true };
 });
 
 ipcMain.handle('twitch:logout', () => {

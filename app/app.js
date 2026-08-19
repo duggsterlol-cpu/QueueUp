@@ -449,7 +449,7 @@ function renderTwitch(t) {
   $('#sbTitle').textContent = s.text;
   $('#sbSub').textContent = status === 'connected'
     ? (anonymous ? 'Reading chat anonymously — no login needed.' : `Signed in as ${username}.`)
-    : (status === 'error' ? detail : 'Reading chat needs no login — just your channel name.');
+    : (status === 'error' ? detail : 'Sign in, or just enter a channel below to read chat.');
 
   $('#connChannel').textContent = channel ? '#' + channel : 'no channel';
   $('#connSub').textContent = status === 'connected'
@@ -521,8 +521,7 @@ const SETTING_FIELDS = [
   ['#setSubsPriority', 'subsPriority', 'bool'],
   ['#setPort', 'port', 'int'],
   ['#setAutoUpdate', 'autoUpdate', 'bool'],
-  ['#setBotReplies', 'botReplies', 'bool'],
-  ['#setClientId', 'clientId', 'text']
+  ['#setBotReplies', 'botReplies', 'bool']
 ];
 
 function fillSettings() {
@@ -534,11 +533,21 @@ function fillSettings() {
   }
 
   const signedIn = !!state.settings.accessToken;
-  const auth = $('#authState');
-  auth.textContent = signedIn ? `Signed in as ${state.settings.botUsername}` : 'Not signed in';
-  auth.classList.toggle('ok', signedIn);
-  $('#btnLogout').disabled = !signedIn;
-  $('#setBotReplies').disabled = !signedIn;
+  const login = state.settings.botUsername || '';
+
+  $('#signedIn').hidden = !signedIn;
+  $('#signedOut').hidden = signedIn;
+
+  if (signedIn) {
+    $('#acctName').textContent = login;
+    const av = $('#acctAvatar');
+    av.textContent = login.charAt(0).toUpperCase();
+    av.style.background = avatarStyle(login);
+  }
+
+  const configured = !state.auth || state.auth.configured !== false;
+  $('#btnLogin').disabled = !configured;
+  $('#btnLogin').title = configured ? '' : 'This build has no Twitch app ID compiled in.';
 }
 
 function wireSettings() {
@@ -637,9 +646,6 @@ function syncUrls() {
   const url = overlayUrl();
   $('#overlayUrl').textContent = url || 'starting server…';
   $('#setOverlayUrl').textContent = url || '—';
-  $('#redirectUrl').textContent = state.port
-    ? `http://localhost:${state.port}/auth/callback`
-    : 'http://localhost:4747/auth/callback';
   if (url && !previewLoaded) {
     previewLoaded = true;
     $('#previewFrame').src = url + '?preview=1';
@@ -713,10 +719,13 @@ function wire() {
   });
 
   $('#btnLogin').addEventListener('click', async () => {
-    const id = $('#setClientId').value.trim();
-    const res = await window.hq.login(id);
-    if (!res.ok) toast('Paste your Twitch app Client ID first', 'err');
-    else toast('Finish the sign-in in your browser', 'info');
+    const res = await window.hq.login();
+    if (res.ok) return toast('Approve QueueUp in your browser to finish', 'info');
+    if (res.reason === 'bad_port') {
+      toast(`Port ${res.port} can't be used for sign-in — free up port 4747 and restart`, 'err');
+    } else {
+      toast('This build has no Twitch app ID compiled in', 'err');
+    }
   });
   $('#btnLogout').addEventListener('click', async () => {
     await window.hq.logout();
@@ -732,10 +741,6 @@ function wire() {
   $('#btnCopyUrl').addEventListener('click', copyUrl);
   $('#btnCopyUrl2').addEventListener('click', copyUrl);
   $('#btnOpenOverlay').addEventListener('click', () => window.hq.openExternal(overlayUrl()));
-  $('#btnCopyRedirect').addEventListener('click', () => {
-    window.hq.copy($('#redirectUrl').textContent);
-    toast('Redirect URL copied');
-  });
 
   $('#btnResetOverlay').addEventListener('click', async () => {
     state.overlay = await window.hq.resetOverlay();
@@ -803,7 +808,10 @@ async function boot() {
   window.hq.onState(s => applyState(s));
   window.hq.onTwitch(t => renderTwitch(t));
   window.hq.onLog(item => addLog(item));
-  window.hq.onAuth(a => { if (a.ok) toast(`Signed in as ${a.login}`); });
+  window.hq.onAuth(a => {
+    if (a.ok) toast(`Signed in as ${a.login}`);
+    else if (a.reason === 'expired') toast('Twitch sign-in expired — sign in again', 'err');
+  });
   window.hq.onUpdate(u => renderUpdate(u));
 }
 

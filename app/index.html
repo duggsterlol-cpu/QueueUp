@@ -310,56 +310,60 @@
         <section class="panel card">
           <header class="panel-head"><div class="panel-title"><h2>Twitch</h2></div></header>
           <div class="card-body">
-            <label class="ctl"><span>Your channel</span>
-              <input class="input" type="text" id="setChannel" placeholder="yourtwitchname" autocomplete="off" spellcheck="false" />
-            </label>
+
+            <div class="signin" id="signedOut">
+              <p class="hint">
+                Sign in once and QueueUp reads your chat and replies from your own account.
+                Nothing to set up — no developer console, no tokens to copy.
+              </p>
+              <button class="btn btn-twitch btn-block btn-lg" id="btnLogin">
+                <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 3h17v11.5l-5 5h-3.5l-3 3H7v-3H4V3zm2 2v11h3v3l3-3h3.5l3.5-3.5V5H6zm6 3h2v5h-2V8zm5 0h2v5h-2V8z"/></svg>
+                Sign in with Twitch
+              </button>
+              <p class="hint hint-sm">
+                Everything runs on your PC. Your token is stored locally and only used to connect
+                your machine to Twitch chat.
+              </p>
+            </div>
+
+            <div class="signin" id="signedIn" hidden>
+              <div class="account">
+                <div class="acct-avatar" id="acctAvatar"></div>
+                <div class="acct-main">
+                  <div class="acct-name" id="acctName">—</div>
+                  <div class="acct-sub">Signed in — chatting from this account</div>
+                </div>
+                <button class="btn btn-ghost" id="btnLogout">Sign out</button>
+              </div>
+              <label class="ctl ctl-switch"><span>Reply to viewers in chat</span>
+                <input type="checkbox" id="setBotReplies" class="switch" /></label>
+            </div>
+
             <div class="status-block" id="connStatusBlock">
               <span class="dot" id="dot3"></span>
               <div>
                 <div class="sb-title" id="sbTitle">Not connected</div>
-                <div class="sb-sub" id="sbSub">Reading chat needs no login — just your channel name.</div>
+                <div class="sb-sub" id="sbSub">Sign in, or just enter a channel below to read chat.</div>
               </div>
             </div>
+
             <div class="btn-row">
               <button class="btn btn-primary" id="btnConnect">Connect</button>
               <button class="btn btn-ghost" id="btnDisconnect">Disconnect</button>
             </div>
+
             <label class="ctl ctl-switch"><span>Auto-connect on launch</span>
               <input type="checkbox" id="setAutoConnect" class="switch" /></label>
-          </div>
-        </section>
 
-        <section class="panel card">
-          <header class="panel-head"><div class="panel-title"><h2>Bot replies <span class="pill pill-soft">optional</span></h2></div></header>
-          <div class="card-body">
-            <p class="hint">
-              QueueUp reads chat anonymously by default. Sign in with your Twitch account so it can
-              <em>reply as you</em> — confirming joins (“you’ve been added to the queue — you’re #4”)
-              and posting the full list when someone types the queue command.
-            </p>
-            <div class="auth-state" id="authState">Not signed in</div>
-            <label class="ctl"><span>Twitch app Client ID</span>
-              <input class="input" type="text" id="setClientId" placeholder="paste your Client ID" autocomplete="off" spellcheck="false" />
-            </label>
-            <div class="btn-row">
-              <button class="btn btn-twitch" id="btnLogin">
-                <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 3h17v11.5l-5 5h-3.5l-3 3H7v-3H4V3zm2 2v11h3v3l3-3h3.5l3.5-3.5V5H6zm6 3h2v5h-2V8zm5 0h2v5h-2V8z"/></svg>
-                Sign in with Twitch
-              </button>
-              <button class="btn btn-ghost" id="btnLogout">Sign out</button>
-            </div>
-            <label class="ctl ctl-switch"><span>Reply to viewers in chat</span>
-              <input type="checkbox" id="setBotReplies" class="switch" /></label>
             <details class="howto">
-              <summary>How do I get a Client ID?</summary>
-              <ol>
-                <li>Open <a href="#" class="ext" data-url="https://dev.twitch.tv/console/apps/create">dev.twitch.tv/console/apps/create</a></li>
-                <li>Name: anything. Category: <em>Chat Bot</em>.</li>
-                <li>OAuth Redirect URL: <code id="redirectUrl">http://localhost:4747/auth/callback</code>
-                  <button class="linkbtn" id="btnCopyRedirect">copy</button></li>
-                <li>Create it, hit <em>Manage</em>, copy the Client ID into the box above.</li>
-                <li>Click <em>Sign in with Twitch</em>.</li>
-              </ol>
+              <summary>Read chat without signing in</summary>
+              <p class="hint">
+                QueueUp can watch any channel's chat anonymously — it just can't talk back.
+                Type a channel name and hit Connect.
+              </p>
+              <label class="ctl"><span>Channel</span>
+                <input class="input" type="text" id="setChannel" placeholder="yourtwitchname" autocomplete="off" spellcheck="false" />
+              </label>
             </details>
           </div>
         </section>

@@ -106,21 +106,40 @@ function createServer({ store, onAuth, onLog }) {
 
   let current = null;
 
-  function listen(port) {
+  /**
+   * Try each candidate port in turn, then fall back to any free one.
+   *
+   * Order matters: Twitch only redirects to exactly-registered URIs, so the
+   * caller passes the ports registered on the Twitch app first. Landing on one
+   * of those keeps "Sign in with Twitch" working.
+   */
+  function listen(ports) {
+    const queue = (Array.isArray(ports) ? ports : [ports]).map(Number).filter(Boolean);
+
     return new Promise((resolve, reject) => {
       const done = () => {
         current = server.address();
         resolve(current.port);
       };
-      server.once('error', err => {
-        if (err.code === 'EADDRINUSE') {
-          if (onLog) onLog({ type: 'warn', text: `Port ${port} is busy - using a free port instead.` });
+
+      const tryNext = () => {
+        const port = queue.shift();
+
+        if (port === undefined) {
+          server.once('error', reject);
+          if (onLog) onLog({ type: 'warn', text: 'All preferred ports were busy - using a random one.' });
           server.listen(0, '127.0.0.1', done);
-        } else {
-          reject(err);
+          return;
         }
-      });
-      server.listen(port, '127.0.0.1', done);
+
+        server.once('error', err => {
+          if (err.code === 'EADDRINUSE') tryNext();
+          else reject(err);
+        });
+        server.listen(port, '127.0.0.1', done);
+      };
+
+      tryNext();
     });
   }
 

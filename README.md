@@ -33,31 +33,21 @@ npm run dist
 
 ## Connecting Twitch
 
-1. Open **Settings** → type your channel name (just `yourname`, not the full URL).
-2. Hit **Connect**.
+Open **Settings** and click **Sign in with Twitch**. Approve it in the browser window that
+opens, and you're done — QueueUp picks up your channel automatically, reads your chat, and
+replies from your own account.
 
-That's it. Reading chat uses Twitch's anonymous read-only connection, so there's **no login,
-no token, no Twitch app to register**. It reconnects on its own if your internet blips.
+There is no developer console, no app to register, and no token to copy. Everything runs on
+your PC: the token is stored in a local file and used only to open a chat connection from your
+machine to Twitch. Nothing is sent anywhere else, and there is no server in the middle.
 
-### Sign in so your account replies in chat
+Twitch sign-ins expire after a couple of months. QueueUp checks on launch and tells you when
+it's time to sign in again.
 
-Reading chat works anonymously, but *speaking* needs an account. Sign in with your own Twitch
-account and QueueUp posts as you:
+### Without signing in
 
-- `!join` → "@viewer you've been added to the queue — you're #4."
-- `!dequeue` → "@viewer you've been removed from the queue."
-- `!queue` → the full numbered list above.
-
-To set it up:
-
-1. Go to <https://dev.twitch.tv/console/apps/create>
-2. Name: anything. Category: **Chat Bot**.
-3. OAuth Redirect URL: `http://localhost:4747/auth/callback` (there's a copy button in Settings)
-4. Create → **Manage** → copy the Client ID into Settings.
-5. Click **Sign in with Twitch** and approve it in your browser.
-
-Signing in turns on **Reply to viewers in chat** automatically; the toggle in Settings turns
-replies off again without signing out.
+QueueUp can also watch any channel's chat anonymously — it just can't talk back. Expand
+**Read chat without signing in** in Settings, type a channel name, and hit Connect.
 
 ---
 
