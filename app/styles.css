@@ -887,3 +887,28 @@ input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 5px; }
 .acct-sub { font-size: 11.5px; color: #6cf0da; margin-top: 2px; }
 
 .howto p.hint { margin: 8px 0 10px; }
+
+/* ============================ sign-in steps ============================ */
+
+.steps { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.steps li { display: flex; gap: 11px; align-items: flex-start; }
+
+.step-n {
+  width: 22px; height: 22px;
+  border-radius: 99px;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 800;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  color: #c9a6ff;
+  flex: none;
+  margin-top: 2px;
+}
+
+.step-body { flex: 1; min-width: 0; }
+.step-title { font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin-bottom: 8px; }
+.step-body .field-inline { display: flex; gap: 6px; }
+.step-body .field-inline .input { flex: 1; }
+
+.ext-link { color: var(--accent); cursor: pointer; }
+.ext-link:hover { text-decoration: underline; }

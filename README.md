@@ -33,18 +33,25 @@ npm run dist
 
 ## Connecting Twitch
 
-Open **Settings** and click **Sign in with Twitch**. Approve it in the browser window that
-opens, and you're done — QueueUp picks up your channel automatically, reads your chat, and
-replies from your own account.
+Open **Settings**. Two clicks, once:
 
-There is no developer console, no app to register, and no token to copy. Everything runs on
-your PC: the token is stored in a local file and used only to open a chat connection from your
-machine to Twitch. Nothing is sent anywhere else, and there is no server in the middle.
+1. **Connect with Twitch** — opens a chat-token page in your browser. Approve it on Twitch's own
+   screen and it hands you a token.
+2. **Paste it in** and hit Save.
 
-Twitch sign-ins expire after a couple of months. QueueUp checks on launch and tells you when
-it's time to sign in again.
+That's the whole setup. QueueUp picks up your channel name automatically, reads your chat, and
+replies from your own account. There's no developer console, nothing to register, and no
+account to make.
 
-### Without signing in
+Everything runs on your PC. The token is stored in a local file next to your queue and is used
+for exactly one thing: opening a chat connection from your machine to Twitch. Nothing is sent
+anywhere else and there is no server in the middle. You can revoke it whenever you like from
+[Twitch → Connections](https://www.twitch.tv/settings/connections).
+
+Tokens expire after a couple of months. QueueUp checks on launch and tells you when it's time
+to grab a new one.
+
+### Without connecting
 
 QueueUp can also watch any channel's chat anonymously — it just can't talk back. Expand
 **Read chat without signing in** in Settings, type a channel name, and hit Connect.

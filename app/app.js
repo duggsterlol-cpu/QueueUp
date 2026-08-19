@@ -545,9 +545,6 @@ function fillSettings() {
     av.style.background = avatarStyle(login);
   }
 
-  const configured = !state.auth || state.auth.configured !== false;
-  $('#btnLogin').disabled = !configured;
-  $('#btnLogin').title = configured ? '' : 'This build has no Twitch app ID compiled in.';
 }
 
 function wireSettings() {
@@ -718,15 +715,42 @@ function wire() {
     window.hq.connect();
   });
 
-  $('#btnLogin').addEventListener('click', async () => {
-    const res = await window.hq.login();
-    if (res.ok) return toast('Approve QueueUp in your browser to finish', 'info');
-    if (res.reason === 'bad_port') {
-      toast(`Port ${res.port} can't be used for sign-in — free up port 4747 and restart`, 'err');
-    } else {
-      toast('This build has no Twitch app ID compiled in', 'err');
-    }
+  $('#btnGetToken').addEventListener('click', () => {
+    window.hq.openTokenPage();
+    toast('Approve it in your browser, then paste the token below', 'info');
+    setTimeout(() => $('#tokenInput').focus(), 600);
   });
+
+  const saveToken = async () => {
+    const input = $('#tokenInput');
+    const raw = input.value.trim();
+    if (!raw) { input.focus(); return; }
+
+    const btn = $('#btnSaveToken');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+
+    const res = await window.hq.setToken(raw);
+
+    btn.disabled = false;
+    btn.textContent = 'Save';
+
+    if (res.ok) {
+      input.value = '';
+      toast(`Signed in as ${res.login}`);
+    } else {
+      const why = {
+        malformed: "That doesn't look like a token — copy the whole thing",
+        rejected: 'Twitch rejected that token — try generating a new one',
+        scopes: "That token can't send chat messages — generate a new one",
+        offline: "Couldn't reach Twitch — check your connection"
+      };
+      toast(why[res.reason] || 'That token did not work', 'err');
+      input.select();
+    }
+  };
+  $('#btnSaveToken').addEventListener('click', saveToken);
+  $('#tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveToken(); });
   $('#btnLogout').addEventListener('click', async () => {
     await window.hq.logout();
     toast('Signed out of Twitch', 'info');
@@ -766,7 +790,7 @@ function wire() {
     if (ok) window.hq.clear('all');
   });
 
-  $$('.ext').forEach(a => a.addEventListener('click', e => {
+  $$('.ext, .ext-link').forEach(a => a.addEventListener('click', e => {
     e.preventDefault();
     window.hq.openExternal(a.dataset.url);
   }));

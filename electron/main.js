@@ -72,8 +72,8 @@ function createWindow() {
 /* --------------------------------------------------------------------- */
 
 async function fetchAvatars(logins) {
-  const { accessToken } = store.data.settings;
-  if (!accessToken || !twitchApp.configured()) return;
+  const { accessToken, clientId } = store.data.settings;
+  if (!accessToken || !clientId) return;
   const wanted = [...new Set(logins.map(l => l.toLowerCase()))]
     .filter(l => l && !avatarCache.has(l))
     .slice(0, 100);
@@ -82,7 +82,7 @@ async function fetchAvatars(logins) {
   try {
     const qs = wanted.map(l => 'login=' + encodeURIComponent(l)).join('&');
     const res = await fetch('https://api.twitch.tv/helix/users?' + qs, {
-      headers: { 'Client-Id': twitchApp.TWITCH_CLIENT_ID, Authorization: 'Bearer ' + accessToken }
+      headers: { 'Client-Id': clientId, Authorization: 'Bearer ' + accessToken }
     });
     if (!res.ok) return;
     const json = await res.json();
@@ -180,15 +180,11 @@ async function boot() {
   store = new Store(path.join(app.getPath('userData'), 'queueup-state.json'));
   chat = new TwitchChat();
 
-  server = createServer({
-    store,
-    onLog: pushLog,
-    onAuth: token => validateAndStoreToken(token)
-  });
+  server = createServer({ store, onLog: pushLog });
 
   // Preferred port first, then the rest of the OAuth-registered ports.
-  const wanted = Number(store.data.settings.port) || twitchApp.REDIRECT_PORTS[0];
-  const candidates = [wanted, ...twitchApp.REDIRECT_PORTS.filter(p => p !== wanted)];
+  const wanted = Number(store.data.settings.port) || twitchApp.PREFERRED_PORTS[0];
+  const candidates = [wanted, ...twitchApp.PREFERRED_PORTS.filter(p => p !== wanted)];
   try {
     await server.listen(candidates);
     pushLog({ type: 'info', text: `Overlay server running on http://localhost:${server.port}` });
@@ -258,28 +254,38 @@ function connectChat() {
 }
 
 async function validateAndStoreToken(token) {
+  let info;
   try {
     const res = await fetch('https://id.twitch.tv/oauth2/validate', {
       headers: { Authorization: 'OAuth ' + token }
     });
     if (!res.ok) {
       pushLog({ type: 'error', text: 'Twitch rejected that token.' });
-      return;
+      return { ok: false, reason: 'rejected' };
     }
-    const info = await res.json();
-    // Signing in tells us who they are, so the channel no longer has to be typed.
-    store.updateSettings({
-      accessToken: token,
-      botUsername: info.login,
-      channel: info.login,
-      botReplies: true
-    });
-    pushLog({ type: 'info', text: `Signed in to Twitch as ${info.login}` });
-    send('auth', { ok: true, login: info.login });
-    connectChat();
+    info = await res.json();
   } catch (err) {
-    pushLog({ type: 'error', text: 'Token validation failed: ' + err.message });
+    pushLog({ type: 'error', text: 'Could not reach Twitch: ' + err.message });
+    return { ok: false, reason: 'offline' };
   }
+
+  if (!twitchApp.hasChatScopes(info.scopes)) {
+    pushLog({ type: 'error', text: 'That token has no chat permission.' });
+    return { ok: false, reason: 'scopes' };
+  }
+
+  // Signing in tells us who they are, so the channel no longer has to be typed.
+  store.updateSettings({
+    accessToken: token,
+    botUsername: info.login,
+    clientId: info.client_id || '',
+    channel: info.login,
+    botReplies: true
+  });
+  pushLog({ type: 'info', text: `Signed in to Twitch as ${info.login}` });
+  send('auth', { ok: true, login: info.login });
+  connectChat();
+  return { ok: true, login: info.login };
 }
 
 /* --------------------------------------------------------------------- */
@@ -292,10 +298,8 @@ function fullState() {
     port: server ? server.port : null,
     version: app.getVersion(),
     auth: {
-      configured: twitchApp.configured(),
       signedIn: !!store.data.settings.accessToken,
-      login: store.data.settings.botUsername || '',
-      portOk: server ? twitchApp.isRegisteredPort(server.port) : false
+      login: store.data.settings.botUsername || ''
     },
     update: updater ? updater.state : null,
     twitch: chat.state,
@@ -347,15 +351,16 @@ ipcMain.handle('overlay:reset', () => store.resetOverlay());
 ipcMain.handle('twitch:connect', () => { connectChat(); return chat.state; });
 ipcMain.handle('twitch:disconnect', () => { chat.disconnect(); return chat.state; });
 
-ipcMain.handle('twitch:login', () => {
-  if (!twitchApp.configured()) {
-    return { ok: false, reason: 'not_configured' };
-  }
-  if (!twitchApp.isRegisteredPort(server.port)) {
-    return { ok: false, reason: 'bad_port', port: server.port };
-  }
-  shell.openExternal(twitchApp.authorizeUrl(server.port));
+ipcMain.handle('twitch:openTokenPage', () => {
+  shell.openExternal(twitchApp.TOKEN_GENERATOR_URL);
   return { ok: true };
+});
+
+ipcMain.handle('twitch:setToken', async (_e, raw) => {
+  if (!twitchApp.looksLikeToken(raw)) {
+    return { ok: false, reason: 'malformed' };
+  }
+  return validateAndStoreToken(twitchApp.normalizeToken(raw));
 });
 
 ipcMain.handle('twitch:logout', () => {

@@ -313,16 +313,36 @@
 
             <div class="signin" id="signedOut">
               <p class="hint">
-                Sign in once and QueueUp reads your chat and replies from your own account.
-                Nothing to set up — no developer console, no tokens to copy.
+                Two clicks, once. QueueUp then reads your chat and replies from your own account.
+                No developer console, nothing to configure.
               </p>
-              <button class="btn btn-twitch btn-block btn-lg" id="btnLogin">
-                <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 3h17v11.5l-5 5h-3.5l-3 3H7v-3H4V3zm2 2v11h3v3l3-3h3.5l3.5-3.5V5H6zm6 3h2v5h-2V8zm5 0h2v5h-2V8z"/></svg>
-                Sign in with Twitch
-              </button>
+
+              <ol class="steps">
+                <li>
+                  <span class="step-n">1</span>
+                  <div class="step-body">
+                    <div class="step-title">Get your chat token</div>
+                    <button class="btn btn-twitch" id="btnGetToken">
+                      <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 3h17v11.5l-5 5h-3.5l-3 3H7v-3H4V3zm2 2v11h3v3l3-3h3.5l3.5-3.5V5H6zm6 3h2v5h-2V8zm5 0h2v5h-2V8z"/></svg>
+                      Connect with Twitch
+                    </button>
+                  </div>
+                </li>
+                <li>
+                  <span class="step-n">2</span>
+                  <div class="step-body">
+                    <div class="step-title">Paste what it gives you</div>
+                    <div class="field-inline">
+                      <input class="input" type="password" id="tokenInput" placeholder="oauth:..." autocomplete="off" spellcheck="false" />
+                      <button class="btn btn-primary" id="btnSaveToken">Save</button>
+                    </div>
+                  </div>
+                </li>
+              </ol>
+
               <p class="hint hint-sm">
-                Everything runs on your PC. Your token is stored locally and only used to connect
-                your machine to Twitch chat.
+                The token stays on this PC and only connects your machine to Twitch chat. Revoke it
+                any time from <span class="ext-link" data-url="https://www.twitch.tv/settings/connections">Twitch → Connections</span>.
               </p>
             </div>
 

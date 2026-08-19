@@ -1,50 +1,52 @@
 'use strict';
 
 /**
- * QueueUp's own Twitch application identity.
+ * Twitch will not mint a chat token without an OAuth client ID identifying the
+ * requesting app, and registering one means a trip through the developer
+ * console. To keep that out of QueueUp entirely, we send people to a public
+ * chat-token generator instead: they approve QueueUp-style chat access on
+ * Twitch's own consent screen and get a token back to paste in once.
  *
- * A client ID is public by design - it names the app during the OAuth
- * handshake and is not a secret. The token it produces is what matters, and
- * that never leaves this machine: it's stored in the local state file and used
- * only to open an IRC connection from your PC to Twitch.
- *
- * Because this is baked in, nobody using QueueUp ever has to visit the Twitch
- * developer console. They click "Sign in with Twitch" and that's it.
+ * The token lives only in the local state file and is used for exactly one
+ * thing - opening an IRC connection from this machine to Twitch chat.
  */
-const TWITCH_CLIENT_ID = '';
+const TOKEN_GENERATOR_URL = 'https://twitchapps.com/tmi/';
+
+/** A chat token is useless to us without both of these. */
+const REQUIRED_SCOPES = ['chat:read', 'chat:edit'];
+
+/** Ports to prefer for the overlay server, in order. */
+const PREFERRED_PORTS = [4747, 4748, 4749, 4750];
+
+/** Accepts `oauth:abc123`, `abc123`, or either with stray whitespace/quotes. */
+function normalizeToken(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/^oauth:/i, '')
+    .trim();
+}
+
+function looksLikeToken(raw) {
+  const t = normalizeToken(raw);
+  return /^[a-z0-9]{20,60}$/i.test(t);
+}
 
 /**
- * Twitch matches redirect URIs exactly, so every port we might listen on has to
- * be registered on the app up front. We try these in order and use whichever
- * one we actually got.
+ * The generator hands out a legacy `chat_login` scope on some accounts and the
+ * modern pair on others; both authorize reading and sending chat.
  */
-const REDIRECT_PORTS = [4747, 4748, 4749, 4750];
-
-const SCOPES = ['chat:read', 'chat:edit'];
-
-function redirectUri(port) {
-  return `http://localhost:${port}/auth/callback`;
-}
-
-function isRegisteredPort(port) {
-  return REDIRECT_PORTS.includes(Number(port));
-}
-
-function authorizeUrl(port) {
-  return 'https://id.twitch.tv/oauth2/authorize' +
-    `?client_id=${encodeURIComponent(TWITCH_CLIENT_ID)}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri(port))}` +
-    '&response_type=token' +
-    `&scope=${encodeURIComponent(SCOPES.join(' '))}` +
-    '&force_verify=true';
+function hasChatScopes(scopes) {
+  const list = Array.isArray(scopes) ? scopes.map(s => String(s).toLowerCase()) : [];
+  if (list.includes('chat_login')) return true;
+  return REQUIRED_SCOPES.every(s => list.includes(s));
 }
 
 module.exports = {
-  TWITCH_CLIENT_ID,
-  REDIRECT_PORTS,
-  SCOPES,
-  redirectUri,
-  isRegisteredPort,
-  authorizeUrl,
-  configured: () => TWITCH_CLIENT_ID.length > 0
+  TOKEN_GENERATOR_URL,
+  REQUIRED_SCOPES,
+  PREFERRED_PORTS,
+  normalizeToken,
+  looksLikeToken,
+  hasChatScopes
 };
