@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Stream queue manager for viewer games - Twitch chat integration + OBS overlay",
   "main": "electron/main.js",
-  "author": "duggylol",
+  "author": "duggsterlol-cpu",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -21,7 +21,7 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.duggylol.queueup",
+    "appId": "com.duggsterlol.queueup",
     "productName": "QueueUp",
     "directories": {
       "output": "dist"
@@ -53,13 +53,13 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "duggylol",
+        "owner": "duggsterlol-cpu",
         "repo": "QueueUp"
       }
     ]
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/duggylol/QueueUp.git"
+    "url": "https://github.com/duggsterlol-cpu/QueueUp.git"
   }
 }
