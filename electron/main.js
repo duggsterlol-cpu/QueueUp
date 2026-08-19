@@ -209,6 +209,7 @@ async function boot() {
   updater = createUpdater({
     isPackaged: app.isPackaged,
     currentVersion: app.getVersion(),
+    logDir: app.getPath('userData'),
     onLog: pushLog,
     onStatus: st => send('update', st)
   });

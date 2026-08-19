@@ -54,7 +54,8 @@
       {
         "provider": "github",
         "owner": "duggsterlol-cpu",
-        "repo": "QueueUp"
+        "repo": "QueueUp",
+        "releaseType": "release"
       }
     ]
   },

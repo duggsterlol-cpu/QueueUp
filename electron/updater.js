@@ -1,4 +1,6 @@
 'use strict';
+const fs = require('fs');
+const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
 /**
@@ -9,7 +11,21 @@ const { autoUpdater } = require('electron-updater');
  * unpackaged dev run that file doesn't exist, so every call here no-ops
  * instead of throwing.
  */
-function createUpdater({ isPackaged, onStatus, onLog, currentVersion }) {
+function createUpdater({ isPackaged, onStatus, onLog, currentVersion, logDir }) {
+  // A tiny rolling log so a failed update can be diagnosed after the fact.
+  const logFile = logDir ? path.join(logDir, 'update.log') : null;
+  const writeLog = (level, ...args) => {
+    if (!logFile) return;
+    const line = `[${new Date().toISOString()}] ${level} ${args.map(String).join(' ')}
+`;
+    try {
+      if (fs.existsSync(logFile) && fs.statSync(logFile).size > 256 * 1024) {
+        fs.writeFileSync(logFile, '');
+      }
+      fs.appendFileSync(logFile, line);
+    } catch (_) { /* logging must never break the app */ }
+  };
+
   let state = {
     status: isPackaged ? 'idle' : 'dev',
     version: currentVersion,
@@ -26,7 +42,12 @@ function createUpdater({ isPackaged, onStatus, onLog, currentVersion }) {
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.logger = null;
+  autoUpdater.logger = {
+    info: (...a) => writeLog('INFO', ...a),
+    warn: (...a) => writeLog('WARN', ...a),
+    error: (...a) => writeLog('ERROR', ...a),
+    debug: () => {}
+  };
 
   autoUpdater.on('checking-for-update', () => push({ status: 'checking', error: '' }));
 
