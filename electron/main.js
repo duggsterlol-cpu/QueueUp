@@ -1,4 +1,5 @@
 'use strict';
+const fs = require('fs');
 const path = require('path');
 const { app, BrowserWindow, ipcMain, shell, clipboard, dialog } = require('electron');
 const { Store, formatQueueMessage } = require('./state');
@@ -15,6 +16,19 @@ let chat = null;
 let server = null;
 let updater = null;
 const logs = [];
+let loginLogFile = null;
+
+/** Rolling diagnostic trail for the Twitch login, tokens redacted. */
+function loginLog(level, ...args) {
+  if (!loginLogFile) return;
+  try {
+    if (fs.existsSync(loginLogFile) && fs.statSync(loginLogFile).size > 128 * 1024) {
+      fs.writeFileSync(loginLogFile, '');
+    }
+    fs.appendFileSync(loginLogFile, `[${new Date().toISOString()}] ${level} ${args.join(' ')}
+`);
+  } catch (_) { /* logging must never break the login */ }
+}
 const avatarCache = new Map();
 
 function pushLog(entry) {
@@ -181,7 +195,17 @@ async function boot() {
   store = new Store(path.join(app.getPath('userData'), 'queueup-state.json'));
   chat = new TwitchChat();
 
-  server = createServer({ store, onLog: pushLog });
+  loginLogFile = path.join(app.getPath('userData'), 'login.log');
+  twitchLogin.setLogger(loginLog);
+
+  server = createServer({
+    store,
+    onLog: pushLog,
+    onAuthReturn: () => {
+      loginLog('INFO', 'browser returned to /auth/done');
+      if (authReturned) authReturned();
+    }
+  });
 
   // Preferred port first, then the rest of the OAuth-registered ports.
   const wanted = Number(store.data.settings.port) || twitchApp.PREFERRED_PORTS[0];
@@ -323,6 +347,7 @@ ipcMain.handle('twitch:connect', () => { connectChat(); return chat.state; });
 ipcMain.handle('twitch:disconnect', () => { chat.disconnect(); return chat.state; });
 
 let loginSession = null;
+let authReturned = null;
 
 ipcMain.handle('twitch:login', async () => {
   if (loginSession) return { ok: false, reason: 'in_progress' };
@@ -330,30 +355,45 @@ ipcMain.handle('twitch:login', async () => {
   loginSession = { cancelled: false };
   const session = loginSession;
 
+  // Resolved when the browser lands on /auth/done, so we claim the token the
+  // moment it's ready instead of waiting out a poll interval.
+  let resolveReturn;
+  const returned = new Promise(r => { resolveReturn = r; });
+  authReturned = resolveReturn;
+
   try {
+    loginLog('INFO', '--- login started ---');
     send('login', { status: 'starting' });
-    const { id, url } = await twitchLogin.begin();
+
+    const redirect = server.port ? `http://localhost:${server.port}/auth/done` : '';
+    const { id, url } = await twitchLogin.begin(redirect);
+    loginLog('INFO', `session ${id}, redirect ${redirect || '(none)'}`);
 
     if (session.cancelled) return { ok: false, reason: 'cancelled' };
 
     shell.openExternal(url);
     send('login', { status: 'waiting', url });
-    pushLog({ type: 'info', text: 'Waiting for you to approve QueueUp on Twitch...' });
+    pushLog({ type: 'info', text: 'Waiting for you to authorize QueueUp on Twitch...' });
 
-    const creds = await twitchLogin.pollForToken(id, {
-      shouldStop: () => session.cancelled
+    const creds = await twitchLogin.waitForToken(id, {
+      shouldStop: () => session.cancelled,
+      wake: () => returned,
+      onTick: n => loginLog('INFO', `poll ${n}`)
     });
 
     const result = await storeCredentials(creds);
+    loginLog(result.ok ? 'INFO' : 'ERROR', `store result: ${JSON.stringify(result)}`);
     send('login', result.ok ? { status: 'done', login: result.login } : { status: 'error', reason: result.reason });
     return result;
   } catch (err) {
     const reason = err.code || 'failed';
+    loginLog('ERROR', `${reason}: ${err.message}`);
     if (reason !== 'cancelled') pushLog({ type: 'error', text: err.message });
     send('login', { status: reason === 'cancelled' ? 'idle' : 'error', reason, message: err.message });
     return { ok: false, reason, message: err.message };
   } finally {
     if (loginSession === session) loginSession = null;
+    if (authReturned === resolveReturn) authReturned = null;
   }
 });
 

@@ -8,8 +8,9 @@ const { WebSocketServer } = require('ws');
  * Local HTTP + WebSocket server.
  *  - serves the OBS browser source at /overlay
  *  - pushes live state to every connected overlay/preview over /ws
+ *  - catches the browser coming back from the Twitch login
  */
-function createServer({ store, onLog }) {
+function createServer({ store, onLog, onAuthReturn }) {
   const app = express();
   app.use(express.json());
 
@@ -20,6 +21,31 @@ function createServer({ store, onLog }) {
 
   app.get('/api/state', (_req, res) => {
     res.json(publicState(store));
+  });
+
+  // Where the token service sends the browser once the user has authorized.
+  app.get('/auth/done', (_req, res) => {
+    if (typeof onAuthReturn === 'function') onAuthReturn();
+    res.type('html').send(`<!doctype html><meta charset="utf-8">
+<title>QueueUp — connected</title>
+<style>
+  :root { color-scheme: dark }
+  body { margin:0; height:100vh; display:grid; place-items:center; background:#080a0f; color:#e9ebf3;
+         font:600 15px/1.6 "Segoe UI",system-ui,sans-serif; text-align:center }
+  .card { padding:38px 46px; border:1px solid rgba(255,255,255,.07); border-radius:18px;
+          background:#10131b; box-shadow:0 18px 40px -18px rgba(0,0,0,.9) }
+  .mark { width:52px; height:52px; margin:0 auto 18px; border-radius:16px; display:grid; place-items:center;
+          font-size:19px; font-weight:800; color:#fff;
+          background:linear-gradient(140deg,#a970ff,#6b3bd6); box-shadow:0 14px 34px -12px rgba(169,112,255,.9) }
+  h1 { margin:0 0 6px; font-size:19px }
+  p { margin:0; color:#9aa1b5; font-weight:500; font-size:13.5px }
+</style>
+<div class="card">
+  <div class="mark">QU</div>
+  <h1>You're connected</h1>
+  <p>QueueUp is linking your account — you can close this tab.</p>
+</div>
+<script>setTimeout(function(){ window.close(); }, 2500);</script>`);
   });
 
   const server = http.createServer(app);

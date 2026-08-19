@@ -1,6 +1,6 @@
 {
   "name": "queueup",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Stream queue manager for viewer games - Twitch chat integration + OBS overlay",
   "main": "electron/main.js",
   "author": "duggsterlol-cpu",
