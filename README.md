@@ -33,25 +33,21 @@ npm run dist
 
 ## Connecting Twitch
 
-Open **Settings**. Two clicks, once:
+Open **Settings** and click **Log in with Twitch**. Your browser opens, you log in on Twitch's
+own page, and QueueUp picks it up on its own.
 
-1. **Connect with Twitch** — opens a chat-token page in your browser. Approve it on Twitch's own
-   screen and it hands you a token.
-2. **Paste it in** and hit Save.
+That's the whole setup. No account to register, no developer console, nothing to copy or paste.
+Your channel name is detected from the login, so there's nothing to type either.
 
-That's the whole setup. QueueUp picks up your channel name automatically, reads your chat, and
-replies from your own account. There's no developer console, nothing to register, and no
-account to make.
+QueueUp keeps you logged in and renews the session by itself in the background. If it ever
+can't, it says so on launch and one click puts it right.
 
-Everything runs on your PC. The token is stored in a local file next to your queue and is used
-for exactly one thing: opening a chat connection from your machine to Twitch. Nothing is sent
-anywhere else and there is no server in the middle. You can revoke it whenever you like from
+Everything runs on your PC. The credential is stored in a local file beside your queue and does
+exactly one thing: open a chat connection from your machine to Twitch. Nothing is sent anywhere
+else and there is no server in the middle. Revoke it any time from
 [Twitch → Connections](https://www.twitch.tv/settings/connections).
 
-Tokens expire after a couple of months. QueueUp checks on launch and tells you when it's time
-to grab a new one.
-
-### Without connecting
+### Without logging in
 
 QueueUp can also watch any channel's chat anonymously — it just can't talk back. Expand
 **Read chat without signing in** in Settings, type a channel name, and hit Connect.
@@ -133,10 +129,11 @@ Players sliding in, dropping out, and moving position are all animated.
 
 ## Updates
 
-QueueUp checks GitHub for a new release when it starts, downloads it in the background, and
-tells you when it's ready. Hit **Restart & install** in Settings → Updates and it swaps itself
-out. There's also a manual **Check for updates** button, and a toggle to stop it checking on
-launch.
+On launch QueueUp shows a brief **Checking for updates…** screen. If you're current it fades
+straight into the app. If there's a new version it downloads right there with a progress bar,
+then offers **Restart & install** (or **Later**, if you're about to go live).
+
+Settings → Updates also has a manual check, and a toggle to skip the launch check entirely.
 
 Updates only apply to the installed app — running from source, the updater sits idle.
 

@@ -465,6 +465,80 @@ function renderTwitch(t) {
 }
 
 
+
+/* ------------------------------------------------------------------ */
+/* startup update check                                               */
+/* ------------------------------------------------------------------ */
+
+const splash = {
+  el: null,
+  done: false,
+  // Never trap the user behind the splash, whatever the network does.
+  failsafe: null
+};
+
+function bootInit() {
+  splash.el = $('#boot');
+  $('#bootInstall').addEventListener('click', () => window.hq.installUpdate());
+  $('#bootSkip').addEventListener('click', () => bootDismiss());
+  splash.failsafe = setTimeout(() => bootDismiss(), 12000);
+}
+
+function bootDismiss() {
+  if (splash.done) return;
+  splash.done = true;
+  clearTimeout(splash.failsafe);
+  splash.el.classList.add('gone');
+}
+
+function bootStatus(text, opts = {}) {
+  if (splash.done) return;
+  $('#bootStatus').textContent = text;
+  const bar = document.querySelector('.boot-bar');
+  if (typeof opts.percent === 'number') {
+    bar.classList.remove('indeterminate');
+    bar.classList.add('determinate');
+    $('#bootFill').style.width = opts.percent + '%';
+  } else {
+    bar.classList.add('indeterminate');
+    bar.classList.remove('determinate');
+  }
+  $('#bootActions').hidden = !opts.actions;
+  if (opts.hold) clearTimeout(splash.failsafe);
+}
+
+/** Drives the splash from update events until it has nothing left to say. */
+function bootUpdate(u) {
+  if (splash.done || !u) return;
+
+  switch (u.status) {
+    case 'checking':
+      bootStatus('Checking for updates…');
+      break;
+    case 'downloading':
+      bootStatus(
+        `Downloading ${u.newVersion || 'update'}…`,
+        { percent: u.percent || 0, hold: true }
+      );
+      break;
+    case 'ready':
+      bootStatus(`Version ${u.newVersion} is ready to install.`, { percent: 100, actions: true, hold: true });
+      break;
+    case 'current':
+      bootStatus('You’re up to date.');
+      setTimeout(bootDismiss, 550);
+      break;
+    case 'error':
+      bootStatus(u.error || 'Could not check for updates.');
+      setTimeout(bootDismiss, 900);
+      break;
+    case 'dev':
+    case 'idle':
+      bootDismiss();
+      break;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* updates                                                            */
 /* ------------------------------------------------------------------ */
@@ -472,6 +546,7 @@ function renderTwitch(t) {
 function renderUpdate(u) {
   if (!u) return;
   state.update = u;
+  bootUpdate(u);
 
   const block = $('#updateBlock');
   const dot = $('#updDot');
@@ -505,6 +580,13 @@ function renderUpdate(u) {
   }
 }
 
+function showLoginWaiting(on, title, sub) {
+  $('#loginWaiting').hidden = !on;
+  $('#signedOut').hidden = on || !!state.settings.accessToken;
+  if (title) $('#waitTitle').textContent = title;
+  if (sub) $('#waitSub').textContent = sub;
+}
+
 /* ------------------------------------------------------------------ */
 /* settings binding                                                   */
 /* ------------------------------------------------------------------ */
@@ -535,8 +617,9 @@ function fillSettings() {
   const signedIn = !!state.settings.accessToken;
   const login = state.settings.botUsername || '';
 
+  const waiting = !$('#loginWaiting').hidden;
   $('#signedIn').hidden = !signedIn;
-  $('#signedOut').hidden = signedIn;
+  $('#signedOut').hidden = signedIn || waiting;
 
   if (signedIn) {
     $('#acctName').textContent = login;
@@ -715,42 +798,30 @@ function wire() {
     window.hq.connect();
   });
 
-  $('#btnGetToken').addEventListener('click', () => {
-    window.hq.openTokenPage();
-    toast('Approve it in your browser, then paste the token below', 'info');
-    setTimeout(() => $('#tokenInput').focus(), 600);
+  $('#btnLogin').addEventListener('click', async () => {
+    showLoginWaiting(true, 'Opening Twitch…', 'A browser window is opening — log in there.');
+    const res = await window.hq.login();
+    showLoginWaiting(false);
+    if (res.ok) return;
+
+    const why = {
+      cancelled: null,
+      in_progress: 'Already waiting on a login',
+      timeout: 'Login timed out — try again',
+      consumed: 'That login link was already used — try again',
+      rejected: 'Twitch rejected that login',
+      scopes: "That login can't send chat messages",
+      offline: "Couldn't reach Twitch — check your connection"
+    };
+    const msg = why[res.reason];
+    if (msg !== null) toast(msg || res.message || 'Login failed', 'err');
   });
 
-  const saveToken = async () => {
-    const input = $('#tokenInput');
-    const raw = input.value.trim();
-    if (!raw) { input.focus(); return; }
+  $('#btnCancelLogin').addEventListener('click', async () => {
+    await window.hq.cancelLogin();
+    showLoginWaiting(false);
+  });
 
-    const btn = $('#btnSaveToken');
-    btn.disabled = true;
-    btn.textContent = 'Checking…';
-
-    const res = await window.hq.setToken(raw);
-
-    btn.disabled = false;
-    btn.textContent = 'Save';
-
-    if (res.ok) {
-      input.value = '';
-      toast(`Signed in as ${res.login}`);
-    } else {
-      const why = {
-        malformed: "That doesn't look like a token — copy the whole thing",
-        rejected: 'Twitch rejected that token — try generating a new one',
-        scopes: "That token can't send chat messages — generate a new one",
-        offline: "Couldn't reach Twitch — check your connection"
-      };
-      toast(why[res.reason] || 'That token did not work', 'err');
-      input.select();
-    }
-  };
-  $('#btnSaveToken').addEventListener('click', saveToken);
-  $('#tokenInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveToken(); });
   $('#btnLogout').addEventListener('click', async () => {
     await window.hq.logout();
     toast('Signed out of Twitch', 'info');
@@ -814,13 +885,18 @@ function applyState(s) {
   fillOverlayControls();
   syncUrls();
   if (s.twitch) renderTwitch(s.twitch);
-  if (s.version) $('#appVersion').textContent = 'v' + s.version;
+  if (s.version) {
+    $('#appVersion').textContent = 'v' + s.version;
+    $('#bootVersion').textContent = 'v' + s.version;
+  }
+  if (s.settings && s.settings.autoUpdate === false) bootDismiss();
   if (s.update) renderUpdate(s.update);
   if (typeof s.overlayClients === 'number') $('#setClients').textContent = s.overlayClients;
 }
 
 async function boot() {
   wire();
+  bootInit();
   clearLog();
 
   const initial = await window.hq.getState();
@@ -832,6 +908,14 @@ async function boot() {
   window.hq.onState(s => applyState(s));
   window.hq.onTwitch(t => renderTwitch(t));
   window.hq.onLog(item => addLog(item));
+  window.hq.onLogin(p => {
+    if (p.status === 'waiting') {
+      showLoginWaiting(true, 'Waiting for Twitch…', 'Approve QueueUp in the browser window.');
+    } else if (p.status === 'idle' || p.status === 'done' || p.status === 'error') {
+      showLoginWaiting(false);
+    }
+  });
+
   window.hq.onAuth(a => {
     if (a.ok) toast(`Signed in as ${a.login}`);
     else if (a.reason === 'expired') toast('Twitch sign-in expired — sign in again', 'err');

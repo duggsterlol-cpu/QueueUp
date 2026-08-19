@@ -8,6 +8,20 @@
 </head>
 <body>
 
+<div class="boot" id="boot">
+  <div class="boot-card">
+    <div class="boot-mark">QU</div>
+    <div class="boot-name">QueueUp</div>
+    <div class="boot-status" id="bootStatus">Checking for updates…</div>
+    <div class="boot-bar indeterminate"><div class="boot-fill" id="bootFill"></div></div>
+    <div class="boot-actions" id="bootActions" hidden>
+      <button class="btn btn-primary" id="bootInstall">Restart &amp; install</button>
+      <button class="btn btn-ghost" id="bootSkip">Later</button>
+    </div>
+    <div class="boot-version" id="bootVersion"></div>
+  </div>
+</div>
+
 <header class="titlebar">
   <div class="tb-left">
     <div class="brand">
@@ -313,37 +327,27 @@
 
             <div class="signin" id="signedOut">
               <p class="hint">
-                Two clicks, once. QueueUp then reads your chat and replies from your own account.
-                No developer console, nothing to configure.
+                Log in once and QueueUp reads your chat and replies from your own account.
+                Nothing to register, nothing to copy.
               </p>
-
-              <ol class="steps">
-                <li>
-                  <span class="step-n">1</span>
-                  <div class="step-body">
-                    <div class="step-title">Get your chat token</div>
-                    <button class="btn btn-twitch" id="btnGetToken">
-                      <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 3h17v11.5l-5 5h-3.5l-3 3H7v-3H4V3zm2 2v11h3v3l3-3h3.5l3.5-3.5V5H6zm6 3h2v5h-2V8zm5 0h2v5h-2V8z"/></svg>
-                      Connect with Twitch
-                    </button>
-                  </div>
-                </li>
-                <li>
-                  <span class="step-n">2</span>
-                  <div class="step-body">
-                    <div class="step-title">Paste what it gives you</div>
-                    <div class="field-inline">
-                      <input class="input" type="password" id="tokenInput" placeholder="oauth:..." autocomplete="off" spellcheck="false" />
-                      <button class="btn btn-primary" id="btnSaveToken">Save</button>
-                    </div>
-                  </div>
-                </li>
-              </ol>
-
+              <button class="btn btn-twitch btn-block btn-lg" id="btnLogin">
+                <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 3h17v11.5l-5 5h-3.5l-3 3H7v-3H4V3zm2 2v11h3v3l3-3h3.5l3.5-3.5V5H6zm6 3h2v5h-2V8zm5 0h2v5h-2V8z"/></svg>
+                Log in with Twitch
+              </button>
               <p class="hint hint-sm">
-                The token stays on this PC and only connects your machine to Twitch chat. Revoke it
-                any time from <span class="ext-link" data-url="https://www.twitch.tv/settings/connections">Twitch → Connections</span>.
+                Your login stays on this PC and is used only to connect your machine to Twitch chat.
+                Revoke it any time from
+                <span class="ext-link" data-url="https://www.twitch.tv/settings/connections">Twitch → Connections</span>.
               </p>
+            </div>
+
+            <div class="signin waiting-box" id="loginWaiting" hidden>
+              <div class="spinner"></div>
+              <div class="waiting-main">
+                <div class="waiting-title" id="waitTitle">Opening Twitch…</div>
+                <div class="waiting-sub" id="waitSub">Approve QueueUp in your browser to finish.</div>
+              </div>
+              <button class="btn btn-ghost" id="btnCancelLogin">Cancel</button>
             </div>
 
             <div class="signin" id="signedIn" hidden>

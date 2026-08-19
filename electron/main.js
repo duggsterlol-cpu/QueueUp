@@ -6,6 +6,7 @@ const { TwitchChat } = require('./twitch');
 const { createServer } = require('./server');
 const { createUpdater } = require('./updater');
 const twitchApp = require('./twitch-app');
+const twitchLogin = require('./twitch-login');
 
 const isDev = !app.isPackaged;
 let win = null;
@@ -219,73 +220,43 @@ async function boot() {
     setTimeout(() => connectChat(), 900);
   }
 
-  // Give the window a moment to settle before hitting the network.
+  // The window shows a "checking for updates" splash on launch, so start the
+  // check as soon as the renderer can receive the result.
   if (store.data.settings.autoUpdate !== false) {
-    setTimeout(() => updater.check(false), 4000);
+    setTimeout(() => updater.check(false), 400);
   }
 
   if (store.data.settings.accessToken) setTimeout(() => revalidateToken(), 1500);
 }
 
-/** Twitch tokens expire (~60 days). Catch that on launch rather than mid-stream. */
+/** Tokens expire. Renew quietly on launch if we can, and only nag if we can't. */
 async function revalidateToken() {
-  const token = store.data.settings.accessToken;
-  if (!token) return;
+  const { accessToken, refreshToken } = store.data.settings;
+  if (!accessToken) return;
+
   try {
     const res = await fetch('https://id.twitch.tv/oauth2/validate', {
-      headers: { Authorization: 'OAuth ' + token }
+      headers: { Authorization: 'OAuth ' + accessToken }
     });
     if (res.ok) return;
-    store.updateSettings({ accessToken: '', botReplies: false });
-    pushLog({ type: 'warn', text: 'Your Twitch sign-in expired - sign in again to chat from your account.' });
-    send('auth', { ok: false, reason: 'expired' });
   } catch (_) {
-    // Offline: keep the token and try again next launch.
+    return; // offline: keep what we have and try again next launch
   }
-}
 
-function connectChat() {
-  const s = store.data.settings;
-  chat.connect({
-    channel: s.channel,
-    token: s.botReplies ? s.accessToken : '',
-    username: s.botUsername || ''
-  });
-}
-
-async function validateAndStoreToken(token) {
-  let info;
-  try {
-    const res = await fetch('https://id.twitch.tv/oauth2/validate', {
-      headers: { Authorization: 'OAuth ' + token }
-    });
-    if (!res.ok) {
-      pushLog({ type: 'error', text: 'Twitch rejected that token.' });
-      return { ok: false, reason: 'rejected' };
+  if (refreshToken) {
+    const renewed = await twitchLogin.refresh(refreshToken);
+    if (renewed && renewed.token) {
+      const result = await storeCredentials(renewed);
+      if (result.ok) {
+        pushLog({ type: 'info', text: 'Twitch login renewed automatically.' });
+        return;
+      }
     }
-    info = await res.json();
-  } catch (err) {
-    pushLog({ type: 'error', text: 'Could not reach Twitch: ' + err.message });
-    return { ok: false, reason: 'offline' };
   }
 
-  if (!twitchApp.hasChatScopes(info.scopes)) {
-    pushLog({ type: 'error', text: 'That token has no chat permission.' });
-    return { ok: false, reason: 'scopes' };
-  }
-
-  // Signing in tells us who they are, so the channel no longer has to be typed.
-  store.updateSettings({
-    accessToken: token,
-    botUsername: info.login,
-    clientId: info.client_id || '',
-    channel: info.login,
-    botReplies: true
-  });
-  pushLog({ type: 'info', text: `Signed in to Twitch as ${info.login}` });
-  send('auth', { ok: true, login: info.login });
-  connectChat();
-  return { ok: true, login: info.login };
+  store.updateSettings({ accessToken: '', refreshToken: '', botReplies: false });
+  pushLog({ type: 'warn', text: 'Your Twitch login expired - log in again to chat from your account.' });
+  send('auth', { ok: false, reason: 'expired' });
 }
 
 /* --------------------------------------------------------------------- */
@@ -351,20 +322,49 @@ ipcMain.handle('overlay:reset', () => store.resetOverlay());
 ipcMain.handle('twitch:connect', () => { connectChat(); return chat.state; });
 ipcMain.handle('twitch:disconnect', () => { chat.disconnect(); return chat.state; });
 
-ipcMain.handle('twitch:openTokenPage', () => {
-  shell.openExternal(twitchApp.TOKEN_GENERATOR_URL);
+let loginSession = null;
+
+ipcMain.handle('twitch:login', async () => {
+  if (loginSession) return { ok: false, reason: 'in_progress' };
+
+  loginSession = { cancelled: false };
+  const session = loginSession;
+
+  try {
+    send('login', { status: 'starting' });
+    const { id, url } = await twitchLogin.begin();
+
+    if (session.cancelled) return { ok: false, reason: 'cancelled' };
+
+    shell.openExternal(url);
+    send('login', { status: 'waiting', url });
+    pushLog({ type: 'info', text: 'Waiting for you to approve QueueUp on Twitch...' });
+
+    const creds = await twitchLogin.pollForToken(id, {
+      shouldStop: () => session.cancelled
+    });
+
+    const result = await storeCredentials(creds);
+    send('login', result.ok ? { status: 'done', login: result.login } : { status: 'error', reason: result.reason });
+    return result;
+  } catch (err) {
+    const reason = err.code || 'failed';
+    if (reason !== 'cancelled') pushLog({ type: 'error', text: err.message });
+    send('login', { status: reason === 'cancelled' ? 'idle' : 'error', reason, message: err.message });
+    return { ok: false, reason, message: err.message };
+  } finally {
+    if (loginSession === session) loginSession = null;
+  }
+});
+
+ipcMain.handle('twitch:cancelLogin', () => {
+  if (loginSession) loginSession.cancelled = true;
+  send('login', { status: 'idle' });
   return { ok: true };
 });
 
-ipcMain.handle('twitch:setToken', async (_e, raw) => {
-  if (!twitchApp.looksLikeToken(raw)) {
-    return { ok: false, reason: 'malformed' };
-  }
-  return validateAndStoreToken(twitchApp.normalizeToken(raw));
-});
-
 ipcMain.handle('twitch:logout', () => {
-  store.updateSettings({ accessToken: '', botUsername: '', botReplies: false });
+  store.updateSettings({ accessToken: '', refreshToken: '', botUsername: '', botReplies: false });
   chat.disconnect();
   return { ok: true };
 });

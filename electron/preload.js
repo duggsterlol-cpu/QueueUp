@@ -29,8 +29,8 @@ contextBridge.exposeInMainWorld('hq', {
 
   connect: () => ipcRenderer.invoke('twitch:connect'),
   disconnect: () => ipcRenderer.invoke('twitch:disconnect'),
-  openTokenPage: () => ipcRenderer.invoke('twitch:openTokenPage'),
-  setToken: token => ipcRenderer.invoke('twitch:setToken', token),
+  login: () => ipcRenderer.invoke('twitch:login'),
+  cancelLogin: () => ipcRenderer.invoke('twitch:cancelLogin'),
   logout: () => ipcRenderer.invoke('twitch:logout'),
 
   copy: text => ipcRenderer.invoke('util:copy', text),
@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('hq', {
   onLog: listen('log'),
   onAuth: listen('auth'),
   onUpdate: listen('update'),
+  onLogin: listen('login'),
   onWindowState: listen('window:state'),
 
   minimize: () => ipcRenderer.send('window:minimize'),

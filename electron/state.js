@@ -19,6 +19,7 @@ const DEFAULT_SETTINGS = {
   botReplies: false,
   clientId: '',
   accessToken: '',
+  refreshToken: '',
   botUsername: ''
 };
 
