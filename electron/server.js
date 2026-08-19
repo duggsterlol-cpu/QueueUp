@@ -52,6 +52,15 @@ function createServer({ store, onLog, onAuthReturn }) {
   const wss = new WebSocketServer({ server, path: '/ws' });
   const clients = new Set();
 
+  // The websocket server re-emits the http server's errors. Without a listener
+  // here, a busy port becomes an unhandled 'error' event and takes the whole
+  // app down before the port fallback below ever gets a chance to run.
+  wss.on('error', err => {
+    if (onLog && err && err.code !== 'EADDRINUSE') {
+      onLog({ type: 'warn', text: 'Overlay socket error: ' + err.message });
+    }
+  });
+
   wss.on('connection', ws => {
     clients.add(ws);
     ws.isAlive = true;

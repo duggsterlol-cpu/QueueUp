@@ -1,15 +1,17 @@
 {
   "name": "queueup",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Stream queue manager for viewer games - Twitch chat integration + OBS overlay",
   "main": "electron/main.js",
   "author": "duggsterlol-cpu",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win",
+    "dist": "npm run check && npm run smoke && electron-builder --win",
     "pack": "electron-builder --win --dir",
-    "release": "electron-builder --win --publish always"
+    "release": "npm run check && npm run smoke && electron-builder --win --publish always",
+    "check": "eslint electron app overlay",
+    "smoke": "node test/smoke.js"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
@@ -18,7 +20,8 @@
   },
   "devDependencies": {
     "electron": "^33.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "eslint": "^10.8.1"
   },
   "build": {
     "appId": "com.duggsterlol.queueup",

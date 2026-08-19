@@ -253,6 +253,61 @@ async function boot() {
   if (store.data.settings.accessToken) setTimeout(() => revalidateToken(), 1500);
 }
 
+function connectChat() {
+  const s = store.data.settings;
+  chat.connect({
+    channel: s.channel,
+    token: s.botReplies ? s.accessToken : '',
+    username: s.botUsername || ''
+  });
+}
+
+/** Confirms a token with Twitch, then adopts the account it belongs to. */
+async function storeCredentials(creds) {
+  const token = twitchApp.normalizeToken(creds.token);
+  if (!token) return { ok: false, reason: 'malformed' };
+
+  let info;
+  try {
+    const res = await fetch('https://id.twitch.tv/oauth2/validate', {
+      headers: { Authorization: 'OAuth ' + token }
+    });
+    if (!res.ok) {
+      loginLog('ERROR', `twitch validate returned HTTP ${res.status}`);
+      pushLog({ type: 'error', text: 'Twitch rejected that login.' });
+      return { ok: false, reason: 'rejected' };
+    }
+    info = await res.json();
+    loginLog('INFO', `validated as ${info.login}, scopes=${JSON.stringify(info.scopes)}`);
+  } catch (err) {
+    loginLog('ERROR', `validate failed: ${err.message}`);
+    pushLog({ type: 'error', text: 'Could not reach Twitch: ' + err.message });
+    return { ok: false, reason: 'offline' };
+  }
+
+  // Twitch validated the token, so take it. If our own scope check disagrees,
+  // trust Twitch and warn - a heuristic here should never be able to block a
+  // working login. If the scopes really are wrong, the IRC connection says so.
+  if (!twitchApp.hasChatScopes(info.scopes)) {
+    loginLog('WARN', `unexpected scopes, continuing anyway: ${JSON.stringify(info.scopes)}`);
+    pushLog({ type: 'warn', text: 'Logged in, but Twitch reported unusual chat permissions.' });
+  }
+
+  // Logging in tells us who they are, so the channel never has to be typed.
+  store.updateSettings({
+    accessToken: token,
+    refreshToken: creds.refresh || store.data.settings.refreshToken || '',
+    clientId: info.client_id || creds.clientId || '',
+    botUsername: info.login,
+    channel: info.login,
+    botReplies: true
+  });
+  pushLog({ type: 'info', text: `Logged in to Twitch as ${info.login}` });
+  send('auth', { ok: true, login: info.login });
+  connectChat();
+  return { ok: true, login: info.login };
+}
+
 /** Tokens expire. Renew quietly on launch if we can, and only nag if we can't. */
 async function revalidateToken() {
   const { accessToken, refreshToken } = store.data.settings;
