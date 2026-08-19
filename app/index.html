@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://static-cdn.jtvnw.net https://*.jtvnw.net; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src http://localhost:* http://127.0.0.1:*; connect-src 'self'" />
+<title>HamQueue</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="titlebar">
+  <div class="tb-left">
+    <div class="brand">
+      <span class="brand-mark">HQ</span>
+      <span class="brand-name">HamQueue</span>
+    </div>
+  </div>
+  <div class="tb-center" id="tbStatus">
+    <span class="dot" id="dot"></span>
+    <span id="statusText">Not connected</span>
+  </div>
+  <div class="tb-right">
+    <button class="winbtn" id="btnMin" title="Minimize" aria-label="Minimize">
+      <svg viewBox="0 0 10 10"><path d="M0 5h10" /></svg>
+    </button>
+    <button class="winbtn" id="btnMax" title="Maximize" aria-label="Maximize">
+      <svg viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" /></svg>
+    </button>
+    <button class="winbtn danger" id="btnClose" title="Close" aria-label="Close">
+      <svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0L0 10" /></svg>
+    </button>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="sidebar">
+    <button class="navitem active" data-view="queue">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span>Queue</span>
+    </button>
+    <button class="navitem" data-view="overlay">
+      <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/></svg>
+      <span>Overlay</span>
+    </button>
+    <button class="navitem" data-view="settings">
+      <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      <span>Settings</span>
+    </button>
+
+    <div class="side-foot">
+      <div class="conn-card" id="connCard">
+        <div class="conn-row">
+          <span class="dot" id="dot2"></span>
+          <span class="conn-channel" id="connChannel">no channel</span>
+        </div>
+        <div class="conn-sub" id="connSub">Connect to start taking !join</div>
+        <button class="btn btn-primary btn-block" id="btnConnectSide">Connect</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <!-- ============================ QUEUE ============================ -->
+    <section class="view active" id="view-queue">
+      <div class="view-head">
+        <div>
+          <h1>Queue</h1>
+          <p class="sub" id="queueSubtitle">Viewers join with <code>!join</code> and leave with <code>!dequeue</code></p>
+        </div>
+        <div class="head-actions">
+          <div class="field-inline">
+            <input id="addInput" class="input" type="text" placeholder="Add a player manually" autocomplete="off" spellcheck="false" />
+            <button class="btn btn-ghost" id="btnAdd">Add</button>
+          </div>
+          <button class="btn" id="btnFill" title="Pull the next players into your party">Fill Party</button>
+          <button class="btn btn-primary" id="btnNext" title="Clear the party and pull the next group in">Next Game</button>
+        </div>
+      </div>
+
+      <div class="queue-grid">
+        <div class="col-left">
+          <section class="panel panel-party">
+            <header class="panel-head">
+              <div class="panel-title">
+                <span class="pill pill-accent">PARTY</span>
+                <h2>Your squad</h2>
+              </div>
+              <span class="counter" id="partyCount">1/4</span>
+            </header>
+
+            <div class="host-card">
+              <div class="avatar host-avatar"><svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.4L21 9.2l-4.8 4.3 1.3 6.5L12 16.8 6.5 20l1.3-6.5L3 9.2l6.6-.8z"/></svg></div>
+              <div class="p-main">
+                <div class="p-name" id="hostName">You</div>
+                <div class="p-meta">Host</div>
+              </div>
+              <span class="tag tag-host">HOST</span>
+            </div>
+
+            <div class="droplist" id="partyList" data-list="party"></div>
+          </section>
+
+          <section class="panel panel-activity">
+            <header class="panel-head">
+              <div class="panel-title">
+                <span class="pill">LIVE</span>
+                <h2>Activity</h2>
+              </div>
+              <button class="linkbtn" id="btnClearLog">clear</button>
+            </header>
+            <div class="log" id="logList"></div>
+          </section>
+        </div>
+
+        <section class="panel panel-queue">
+          <header class="panel-head">
+            <div class="panel-title">
+              <span class="pill">QUEUE</span>
+              <h2>Waiting to play</h2>
+            </div>
+            <div class="head-right">
+              <span class="counter" id="queueCount">0 waiting</span>
+              <button class="linkbtn" id="btnClearQueue">clear all</button>
+            </div>
+          </header>
+
+          <div class="listhead">
+            <span class="lh-rank">#</span>
+            <span class="lh-player">PLAYER</span>
+            <span class="lh-wait">WAITING</span>
+            <span class="lh-act">ACTIONS</span>
+          </div>
+
+          <div class="droplist scroll" id="queueList" data-list="queue"></div>
+
+          <div class="empty" id="queueEmpty">
+            <div class="empty-art">
+              <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M17 8h5M19.5 5.5v5"/></svg>
+            </div>
+            <h3>Nobody in the queue yet</h3>
+            <p>Once you're connected, viewers typing <code id="emptyCmd">!join</code> in your chat show up right here.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ============================ OVERLAY ============================ -->
+    <section class="view" id="view-overlay">
+      <div class="view-head">
+        <div>
+          <h1>OBS Overlay</h1>
+          <p class="sub">A transparent browser source showing who's up next. Edits apply live.</p>
+        </div>
+        <div class="head-actions">
+          <button class="btn btn-ghost" id="btnResetOverlay">Reset style</button>
+          <button class="btn btn-primary" id="btnCopyUrl">Copy browser source URL</button>
+        </div>
+      </div>
+
+      <div class="overlay-grid">
+        <div class="panel controls scroll" id="overlayControls">
+
+          <div class="ctl-group">
+            <h3>Content</h3>
+            <label class="ctl"><span>Header text</span>
+              <input class="input" type="text" data-ov="title" maxlength="28" />
+            </label>
+            <label class="ctl ctl-switch"><span>Show header</span>
+              <input type="checkbox" data-ov="showTitle" class="switch" />
+            </label>
+            <label class="ctl ctl-switch"><span>Show total waiting</span>
+              <input type="checkbox" data-ov="showHeaderCount" class="switch" />
+            </label>
+            <label class="ctl"><span>Players shown <b data-out="maxRows"></b></span>
+              <input type="range" min="1" max="12" step="1" data-ov="maxRows" />
+            </label>
+            <label class="ctl"><span>Empty message</span>
+              <input class="input" type="text" data-ov="emptyText" maxlength="48" />
+            </label>
+          </div>
+
+          <div class="ctl-group">
+            <h3>Layout</h3>
+            <label class="ctl"><span>Row style</span>
+              <div class="segmented" data-seg="style">
+                <button data-val="cards">Cards</button>
+                <button data-val="bars">Bars</button>
+                <button data-val="minimal">Minimal</button>
+              </div>
+            </label>
+            <label class="ctl"><span>Stack direction</span>
+              <div class="segmented" data-seg="direction">
+                <button data-val="down">Top down</button>
+                <button data-val="up">Bottom up</button>
+              </div>
+            </label>
+            <label class="ctl"><span>Align</span>
+              <div class="segmented" data-seg="align">
+                <button data-val="left">Left</button>
+                <button data-val="right">Right</button>
+              </div>
+            </label>
+            <label class="ctl"><span>Width <b data-out="width"></b>px</span>
+              <input type="range" min="260" max="700" step="10" data-ov="width" />
+            </label>
+            <label class="ctl"><span>Scale <b data-out="scale"></b>x</span>
+              <input type="range" min="0.6" max="2" step="0.05" data-ov="scale" />
+            </label>
+            <label class="ctl"><span>Row spacing <b data-out="gap"></b>px</span>
+              <input type="range" min="0" max="28" step="1" data-ov="gap" />
+            </label>
+            <label class="ctl"><span>Corner radius <b data-out="radius"></b>px</span>
+              <input type="range" min="0" max="30" step="1" data-ov="radius" />
+            </label>
+          </div>
+
+          <div class="ctl-group">
+            <h3>Style</h3>
+            <label class="ctl ctl-color"><span>Accent</span>
+              <input type="color" data-ov="accent" />
+            </label>
+            <label class="ctl ctl-color"><span>Secondary</span>
+              <input type="color" data-ov="accent2" />
+            </label>
+            <label class="ctl ctl-color"><span>Text</span>
+              <input type="color" data-ov="textColor" />
+            </label>
+            <label class="ctl ctl-color"><span>Row background</span>
+              <input type="color" data-ov="rowBg" />
+            </label>
+            <label class="ctl"><span>Row opacity <b data-out="rowOpacity"></b></span>
+              <input type="range" min="0" max="1" step="0.02" data-ov="rowOpacity" />
+            </label>
+            <label class="ctl"><span>Font</span>
+              <select class="input" data-ov="fontFamily">
+                <option value="Inter">Inter / system</option>
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Bebas Neue">Bebas Neue</option>
+                <option value="Impact">Impact</option>
+                <option value="Arial Black">Arial Black</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Consolas">Consolas</option>
+                <option value="Comic Sans MS">Comic Sans MS</option>
+              </select>
+            </label>
+            <label class="ctl"><span>Font weight <b data-out="fontWeight"></b></span>
+              <input type="range" min="400" max="900" step="100" data-ov="fontWeight" />
+            </label>
+          </div>
+
+          <div class="ctl-group">
+            <h3>Elements</h3>
+            <label class="ctl ctl-switch"><span>Position numbers</span>
+              <input type="checkbox" data-ov="showRank" class="switch" /></label>
+            <label class="ctl ctl-switch"><span>Avatars</span>
+              <input type="checkbox" data-ov="showAvatar" class="switch" /></label>
+            <label class="ctl ctl-switch"><span>Wait timers</span>
+              <input type="checkbox" data-ov="showTimer" class="switch" /></label>
+            <label class="ctl ctl-switch"><span>Highlight first player</span>
+              <input type="checkbox" data-ov="highlightFirst" class="switch" /></label>
+          </div>
+
+          <div class="ctl-group">
+            <h3>Effects</h3>
+            <label class="ctl ctl-switch"><span>Glow</span>
+              <input type="checkbox" data-ov="glow" class="switch" /></label>
+            <label class="ctl ctl-switch"><span>Shimmer sweep</span>
+              <input type="checkbox" data-ov="shimmer" class="switch" /></label>
+            <label class="ctl"><span>Animation speed <b data-out="animSpeed"></b>x</span>
+              <input type="range" min="0.4" max="2" step="0.1" data-ov="animSpeed" />
+            </label>
+          </div>
+        </div>
+
+        <div class="preview-wrap">
+          <div class="preview-bar">
+            <div class="url" id="overlayUrl">http://localhost:4747/overlay/</div>
+            <div class="preview-bg-picker">
+              <button class="bgbtn active" data-bg="checker" title="Transparency">Checker</button>
+              <button class="bgbtn" data-bg="game" title="Gameplay-ish">Game</button>
+              <button class="bgbtn" data-bg="dark" title="Dark">Dark</button>
+              <button class="bgbtn" data-bg="light" title="Light">Light</button>
+            </div>
+          </div>
+          <div class="preview-stage bg-checker" id="previewStage">
+            <iframe id="previewFrame" title="Overlay preview"></iframe>
+          </div>
+          <div class="preview-hint">
+            <strong>In OBS:</strong> Sources → <em>+</em> → <em>Browser</em> → paste the URL above.
+            Set width <b id="obsW">420</b>, height <b id="obsH">600</b>, and leave
+            <em>Shutdown source when not visible</em> unchecked.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SETTINGS ============================ -->
+    <section class="view" id="view-settings">
+      <div class="view-head">
+        <div>
+          <h1>Settings</h1>
+          <p class="sub">Twitch connection, commands, and app options.</p>
+        </div>
+      </div>
+
+      <div class="settings-scroll scroll">
+      <div class="settings-grid">
+
+        <section class="panel card">
+          <header class="panel-head"><div class="panel-title"><h2>Twitch</h2></div></header>
+          <div class="card-body">
+            <label class="ctl"><span>Your channel</span>
+              <input class="input" type="text" id="setChannel" placeholder="yourtwitchname" autocomplete="off" spellcheck="false" />
+            </label>
+            <div class="status-block" id="connStatusBlock">
+              <span class="dot" id="dot3"></span>
+              <div>
+                <div class="sb-title" id="sbTitle">Not connected</div>
+                <div class="sb-sub" id="sbSub">Reading chat needs no login — just your channel name.</div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="btnConnect">Connect</button>
+              <button class="btn btn-ghost" id="btnDisconnect">Disconnect</button>
+            </div>
+            <label class="ctl ctl-switch"><span>Auto-connect on launch</span>
+              <input type="checkbox" id="setAutoConnect" class="switch" /></label>
+          </div>
+        </section>
+
+        <section class="panel card">
+          <header class="panel-head"><div class="panel-title"><h2>Bot replies <span class="pill pill-soft">optional</span></h2></div></header>
+          <div class="card-body">
+            <p class="hint">
+              HamQueue reads chat anonymously by default. Sign in with your Twitch account so it can
+              <em>reply as you</em> — confirming joins (“you’ve been added to the queue — you’re #4”)
+              and posting the full list when someone types the queue command.
+            </p>
+            <div class="auth-state" id="authState">Not signed in</div>
+            <label class="ctl"><span>Twitch app Client ID</span>
+              <input class="input" type="text" id="setClientId" placeholder="paste your Client ID" autocomplete="off" spellcheck="false" />
+            </label>
+            <div class="btn-row">
+              <button class="btn btn-twitch" id="btnLogin">
+                <svg viewBox="0 0 24 24" class="ico-fill"><path d="M4 3h17v11.5l-5 5h-3.5l-3 3H7v-3H4V3zm2 2v11h3v3l3-3h3.5l3.5-3.5V5H6zm6 3h2v5h-2V8zm5 0h2v5h-2V8z"/></svg>
+                Sign in with Twitch
+              </button>
+              <button class="btn btn-ghost" id="btnLogout">Sign out</button>
+            </div>
+            <label class="ctl ctl-switch"><span>Reply to viewers in chat</span>
+              <input type="checkbox" id="setBotReplies" class="switch" /></label>
+            <details class="howto">
+              <summary>How do I get a Client ID?</summary>
+              <ol>
+                <li>Open <a href="#" class="ext" data-url="https://dev.twitch.tv/console/apps/create">dev.twitch.tv/console/apps/create</a></li>
+                <li>Name: anything. Category: <em>Chat Bot</em>.</li>
+                <li>OAuth Redirect URL: <code id="redirectUrl">http://localhost:4747/auth/callback</code>
+                  <button class="linkbtn" id="btnCopyRedirect">copy</button></li>
+                <li>Create it, hit <em>Manage</em>, copy the Client ID into the box above.</li>
+                <li>Click <em>Sign in with Twitch</em>.</li>
+              </ol>
+            </details>
+          </div>
+        </section>
+
+        <section class="panel card">
+          <header class="panel-head"><div class="panel-title"><h2>Queue rules</h2></div></header>
+          <div class="card-body">
+            <label class="ctl"><span>Party size (viewers, not counting you)</span>
+              <input class="input input-num" type="number" min="1" max="20" id="setPartySize" />
+            </label>
+            <label class="ctl"><span>Your display name in the party</span>
+              <input class="input" type="text" id="setHostName" maxlength="24" />
+            </label>
+            <div class="ctl-row3">
+              <label class="ctl"><span>Join command</span>
+                <input class="input" type="text" id="setJoinCmd" /></label>
+              <label class="ctl"><span>Leave command</span>
+                <input class="input" type="text" id="setLeaveCmd" /></label>
+              <label class="ctl"><span>Queue list command</span>
+                <input class="input" type="text" id="setListCmd" /></label>
+            </div>
+            <p class="hint">Chat posts (the queue list and join confirmations) need
+              <em>Sign in with Twitch</em> — HamQueue can read chat without it, but not speak.</p>
+            <label class="ctl ctl-switch"><span>Queue is open</span>
+              <input type="checkbox" id="setQueueOpen" class="switch" /></label>
+            <label class="ctl ctl-switch"><span>Subscribers skip ahead of non-subs</span>
+              <input type="checkbox" id="setSubsPriority" class="switch" /></label>
+          </div>
+        </section>
+
+        <section class="panel card">
+          <header class="panel-head"><div class="panel-title"><h2>Overlay server</h2></div></header>
+          <div class="card-body">
+            <label class="ctl"><span>Port (restart to apply)</span>
+              <input class="input input-num" type="number" min="1024" max="65535" id="setPort" />
+            </label>
+            <div class="kv"><span>Browser source URL</span><code id="setOverlayUrl">-</code></div>
+            <div class="kv"><span>Connected sources</span><b id="setClients">0</b></div>
+            <div class="btn-row">
+              <button class="btn btn-ghost" id="btnOpenOverlay">Open in browser</button>
+              <button class="btn btn-ghost" id="btnCopyUrl2">Copy URL</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel card">
+          <header class="panel-head"><div class="panel-title"><h2>Updates</h2></div></header>
+          <div class="card-body">
+            <div class="kv"><span>Installed version</span><b id="appVersion">—</b></div>
+            <div class="update-block" id="updateBlock">
+              <div class="upd-row">
+                <span class="dot" id="updDot"></span>
+                <span class="upd-text" id="updText">Checking…</span>
+              </div>
+              <div class="progress" id="updProgress"><div class="progress-fill" id="updFill"></div></div>
+              <p class="upd-notes" id="updNotes"></p>
+            </div>
+            <div class="btn-row">
+              <button class="btn" id="btnCheckUpdate">Check for updates</button>
+              <button class="btn btn-primary" id="btnInstallUpdate">Restart &amp; install</button>
+            </div>
+            <label class="ctl ctl-switch"><span>Check for updates on launch</span>
+              <input type="checkbox" id="setAutoUpdate" class="switch" /></label>
+          </div>
+        </section>
+
+        <section class="panel card danger-card">
+          <header class="panel-head"><div class="panel-title"><h2>Danger zone</h2></div></header>
+          <div class="card-body">
+            <div class="btn-row">
+              <button class="btn btn-ghost" id="btnClearParty">Clear party</button>
+              <button class="btn btn-ghost" id="btnClearQueue2">Clear queue</button>
+              <button class="btn btn-danger" id="btnClearAll">Clear everything</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
