@@ -1,4 +1,4 @@
-# HamQueue
+# QueueUp
 
 A local Windows desktop app for running a viewer queue on stream. Twitch chat integration,
 drag-and-drop party management, live wait timers, and a transparent OBS overlay.
@@ -11,11 +11,11 @@ No command prompt, no browser tab — it's a real app window.
 
 **Option A — installer**
 
-Run `dist\HamQueue Setup 1.0.0.exe`. It creates a desktop shortcut and a Start menu entry.
+Run `dist\QueueUp Setup 1.0.0.exe`. It creates a desktop shortcut and a Start menu entry.
 
 **Option B — portable**
 
-Run `dist\win-unpacked\HamQueue.exe` directly. No install needed.
+Run `dist\win-unpacked\QueueUp.exe` directly. No install needed.
 
 **Option C — from source**
 
@@ -42,7 +42,7 @@ no token, no Twitch app to register**. It reconnects on its own if your internet
 ### Sign in so your account replies in chat
 
 Reading chat works anonymously, but *speaking* needs an account. Sign in with your own Twitch
-account and HamQueue posts as you:
+account and QueueUp posts as you:
 
 - `!join` → "@viewer you've been added to the queue — you're #4."
 - `!dequeue` → "@viewer you've been removed from the queue."
@@ -134,6 +134,30 @@ Players sliding in, dropping out, and moving position are all animated.
 
 ---
 
+## Updates
+
+QueueUp checks GitHub for a new release when it starts, downloads it in the background, and
+tells you when it's ready. Hit **Restart & install** in Settings → Updates and it swaps itself
+out. There's also a manual **Check for updates** button, and a toggle to stop it checking on
+launch.
+
+Updates only apply to the installed app — running from source, the updater sits idle.
+
+### Publishing a new version (for me/you later)
+
+1. Bump `version` in `package.json`.
+2. Commit and push.
+3. Set a GitHub token with `repo` scope, then:
+
+```bash
+npm run release
+```
+
+That builds the installer and publishes it as a GitHub release. Everyone running QueueUp picks
+it up the next time they open the app.
+
+---
+
 ## Notes
 
 - The overlay server runs on `localhost:4747`, bound to your machine only — nothing is exposed
@@ -141,7 +165,7 @@ Players sliding in, dropping out, and moving position are all animated.
 - Changing the port in Settings needs an app restart.
 - Avatars are generated from each viewer's name. Real Twitch profile pictures appear
   automatically once you've signed in (they need a Client ID to fetch).
-- App state lives at `%APPDATA%\HamQueue\hamqueue-state.json`.
+- App state lives at `%APPDATA%\QueueUp\queueup-state.json`.
 
 ## Layout
 

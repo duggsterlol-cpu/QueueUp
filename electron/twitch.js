@@ -74,7 +74,7 @@ class TwitchChat extends EventEmitter {
     ws.on('open', () => {
       const nick = this.anonymous
         ? 'justinfan' + Math.floor(Math.random() * 80000 + 1000)
-        : (this.username || 'hamqueue');
+        : (this.username || 'queueup');
       ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
       ws.send('PASS oauth:' + (this.anonymous ? 'SCHMOOPIIE' : this.token));
       ws.send('NICK ' + nick);

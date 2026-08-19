@@ -39,7 +39,7 @@ function createWindow() {
     show: false,
     frame: false,
     backgroundColor: '#0a0c11',
-    title: 'HamQueue',
+    title: 'QueueUp',
     icon: path.join(__dirname, '..', 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -129,7 +129,7 @@ function handleChatMessage(msg) {
     if (Date.now() - lastListAt < 8000) return;
     lastListAt = Date.now();
     if (!s.botReplies || !s.accessToken) {
-      pushLog({ type: 'warn', text: `${msg.display} used ${list} — sign in with Twitch to let HamQueue post the list in chat.` });
+      pushLog({ type: 'warn', text: `${msg.display} used ${list} — sign in with Twitch to let QueueUp post the list in chat.` });
       return;
     }
     reply(formatQueueMessage(store.data.queue, s.joinCommand));
@@ -176,7 +176,7 @@ function reply(message) {
 /* --------------------------------------------------------------------- */
 
 async function boot() {
-  store = new Store(path.join(app.getPath('userData'), 'hamqueue-state.json'));
+  store = new Store(path.join(app.getPath('userData'), 'queueup-state.json'));
   chat = new TwitchChat();
 
   server = createServer({
@@ -303,7 +303,7 @@ ipcMain.handle('settings:update', async (_e, patch) => {
   const prev = { ...store.data.settings };
   const next = store.updateSettings(patch);
   if (patch.port && Number(patch.port) !== Number(prev.port)) {
-    pushLog({ type: 'warn', text: 'Port change takes effect after restarting HamQueue.' });
+    pushLog({ type: 'warn', text: 'Port change takes effect after restarting QueueUp.' });
   }
   const reconnect =
     (patch.channel !== undefined && patch.channel !== prev.channel) ||

@@ -1,5 +1,5 @@
 /* ============================================================
-   HamQueue — overlay client
+   QueueUp — overlay client
    Connects back to the app over a websocket and stays live.
    ============================================================ */
 'use strict';

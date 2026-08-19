@@ -27,7 +27,7 @@ function createServer({ store, onAuth, onLog }) {
     // Twitch implicit-grant tokens arrive in the URL fragment, which never
     // reaches the server - so bounce it back up through a POST.
     res.type('html').send(`<!doctype html><meta charset="utf-8">
-<title>HamQueue - Twitch</title>
+<title>QueueUp - Twitch</title>
 <style>
   body{margin:0;height:100vh;display:grid;place-items:center;background:#0b0d12;color:#e8eaf2;
        font:600 15px/1.5 system-ui,Segoe UI,sans-serif;text-align:center}
