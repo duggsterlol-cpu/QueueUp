@@ -157,8 +157,11 @@ it up the next time they open the app.
 - The overlay server runs on `localhost:4747`, bound to your machine only — nothing is exposed
   to the internet. If that port is taken the app picks a free one and updates the URL for you.
 - Changing the port in Settings needs an app restart.
-- Avatars are generated from each viewer's name. Real Twitch profile pictures appear
-  automatically once you've signed in (they need a Client ID to fetch).
+- Viewers show their real Twitch profile picture. Pictures are looked up in batches, cached to
+  disk, and reused on later streams, so this costs almost no network traffic. Anyone without a
+  picture — or a name that isn't a real account — falls back to a colour drawn from their name.
+- The queue and party are saved continuously and restored on launch. Closing, restarting, or
+  updating QueueUp never clears them; only **Clear** does.
 - App state lives at `%APPDATA%\QueueUp\queueup-state.json`.
 
 ## Layout

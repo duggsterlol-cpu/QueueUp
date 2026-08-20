@@ -99,6 +99,7 @@ Module._load = function (request, parent, isMain) {
 const FAKE_TOKEN = 'smoketoken1234567890';
 let tokenClaimed = false;
 const requests = [];
+let helixCalls = 0;
 
 global.fetch = async (url, opts = {}) => {
   const u = String(url);
@@ -124,7 +125,17 @@ global.fetch = async (url, opts = {}) => {
     if (!auth.includes(FAKE_TOKEN)) return { ok: false, status: 401, text: async () => '{}', json: async () => ({}) };
     return json({ login: 'smokestreamer', client_id: 'smokeclient', scopes: ['chat:read', 'chat:edit'] });
   }
-  if (u.includes('helix/users')) return json({ data: [] });
+  if (u.includes('helix/users')) {
+    helixCalls++;
+    const logins = [...new URL(u).searchParams.getAll('login')];
+    // 'ghostuser' deliberately does not exist, so Twitch omits it.
+    return json({
+      data: logins.filter(l => l !== 'ghostuser').map(l => ({
+        login: l, display_name: l,
+        profile_image_url: `https://static-cdn.jtvnw.net/jtv_user_pictures/${l}-profile_image-300x300.png`
+      }))
+    });
+  }
   return json({});
 };
 
@@ -214,7 +225,88 @@ global.fetch = async (url, opts = {}) => {
   ok('settings persist', st.settings.partySize === 4 && st.settings.hostName === 'Streamer');
   ok('overlay settings persist', st.overlay.title === 'UP NEXT' && st.overlay.maxRows === 7);
 
+  console.log('\n[profile pictures]');
+  tokenClaimed = false;                  // let the stub mint a fresh session
+  await call('twitch:login');            // avatars need an authenticated session
+  await call('queue:add', 'alpha');
+  await call('queue:add', 'bravo');
+  await call('queue:add', 'ghostuser');  // no such Twitch account
+  await new Promise(r => setTimeout(r, 500));
+
+  st = await call('app:state');
+  const byName = Object.fromEntries(st.queue.map(e => [e.login, e]));
+  ok('real users get a profile picture',
+    !!byName.alpha && /jtv_user_pictures/.test(byName.alpha.avatar || ''),
+    byName.alpha ? String(byName.alpha.avatar) : 'alpha missing');
+  ok('every real user is filled in', !!(byName.bravo && byName.bravo.avatar));
+  ok('a nonexistent account stays on the fallback', !!byName.ghostuser && !byName.ghostuser.avatar);
+
+  const callsAfterFirst = helixCalls;
+  await call('queue:add', 'alpha2');
+  await new Promise(r => setTimeout(r, 500));
+  ok('lookups are batched, not one per player',
+    helixCalls - callsAfterFirst <= 1, `${helixCalls - callsAfterFirst} calls`);
+
+  const beforeCached = helixCalls;
+  await call('queue:remove', byName.bravo.id);
+  await call('queue:add', 'bravo');
+  await new Promise(r => setTimeout(r, 500));
+  ok('a returning viewer is served from cache',
+    helixCalls === beforeCached, `${helixCalls - beforeCached} extra calls`);
+
+  ok('the cache is written to disk', fs.existsSync(path.join(USER_DATA, 'avatars.json')));
+
+  // Pictures used to be stripped whenever state was loaded from disk.
+  const { Store } = require(path.join(ROOT, 'electron', 'state.js'));
+  const reloaded = new Store(path.join(USER_DATA, 'queueup-state.json'));
+  const persisted = reloaded.data.queue.find(e => e.login === 'alpha');
+  ok('pictures survive a restart', !!(persisted && persisted.avatar),
+    persisted ? String(persisted.avatar) : 'entry missing after reload');
+
+  console.log('\n[persistence]');
+  const stateFile = path.join(USER_DATA, 'queueup-state.json');
+  const { Store: StoreCls } = require(path.join(ROOT, 'electron', 'state.js'));
+
+  // The exact case that lost players: change something, then quit inside the
+  // 250ms debounce window.
+  const quick = new StoreCls(path.join(USER_DATA, 'quit-race.json'));
+  quick.addUser({ login: 'lastsecond', display: 'lastsecond' });
+  quick.flush();
+  const afterQuit = new StoreCls(path.join(USER_DATA, 'quit-race.json'));
+  ok('a player added right before quitting is kept',
+    afterQuit.data.queue.some(e => e.login === 'lastsecond'));
+
+  st = await call('app:state');
+  const liveCount = st.queue.length + st.party.length;
+  ok('there are players to preserve', liveCount > 0, String(liveCount));
+
+  const onDisk = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  ok('the live queue is on disk', (onDisk.queue.length + onDisk.party.length) === liveCount,
+    `disk ${onDisk.queue.length + onDisk.party.length} vs live ${liveCount}`);
+
+  const restarted = new StoreCls(stateFile);
+  ok('a restart restores every player',
+    restarted.data.queue.length + restarted.data.party.length === liveCount);
+  ok('wait timers resume rather than reset',
+    restarted.data.queue.every(e => typeof e.joinedAt === 'number' && e.joinedAt > 0));
+
+  // A torn write must not look like an empty queue.
+  const corrupt = path.join(USER_DATA, 'corrupt.json');
+  fs.writeFileSync(corrupt, '{ "queue": [ {"login":"hal');
+  const recovered = new StoreCls(corrupt);
+  ok('a damaged file is set aside, not overwritten', fs.existsSync(corrupt + '.corrupt'));
+  ok('the app still starts after a damaged file', Array.isArray(recovered.data.queue));
+
+  // Only an explicit clear empties it.
+  await call('queue:clear', 'all');
+  await new Promise(r => setTimeout(r, 350));
+  const cleared = new StoreCls(stateFile);
+  ok('clearing on purpose does empty it',
+    cleared.data.queue.length === 0 && cleared.data.party.length === 0);
+
   console.log('\n[overlay http]');
+  await call('queue:add', 'alpha');   // repopulate so the payload has something to carry
+  await new Promise(r => setTimeout(r, 400));
   const base = `http://localhost:${state0.port}`;
   const realFetchNeeded = requests.length; // keep the stub, hit the server with http directly
   const http = require('http');
@@ -228,7 +320,10 @@ global.fetch = async (url, opts = {}) => {
   const overlay = await get('/overlay/');
   ok('overlay page serves', overlay.status === 200);
   const api = await get('/api/state');
-  ok('overlay state api serves json', api.status === 200 && JSON.parse(api.body).overlay.title === 'UP NEXT');
+  const apiJson = JSON.parse(api.body);
+  ok('overlay state api serves json', api.status === 200 && apiJson.overlay.title === 'UP NEXT');
+  ok('overlay payload carries the pictures',
+    apiJson.queue.some(e => /jtv_user_pictures/.test(e.avatar || '')));
   const done = await get('/auth/done');
   ok('auth return page serves', done.status === 200 && done.body.includes('connected'));
 

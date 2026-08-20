@@ -6,6 +6,7 @@ const { Store, formatQueueMessage } = require('./state');
 const { TwitchChat } = require('./twitch');
 const { createServer } = require('./server');
 const { createUpdater } = require('./updater');
+const { createAvatarService } = require('./avatars');
 const twitchApp = require('./twitch-app');
 const twitchLogin = require('./twitch-login');
 
@@ -29,7 +30,6 @@ function loginLog(level, ...args) {
 `);
   } catch (_) { /* logging must never break the login */ }
 }
-const avatarCache = new Map();
 
 function pushLog(entry) {
   const item = { ts: Date.now(), type: entry.type || 'info', text: String(entry.text || '') };
@@ -83,41 +83,30 @@ function createWindow() {
 }
 
 /* --------------------------------------------------------------------- */
-/* Twitch avatars (optional - needs a Client ID + token)                  */
+/* Twitch avatars                                                         */
 /* --------------------------------------------------------------------- */
 
-async function fetchAvatars(logins) {
-  const { accessToken, clientId } = store.data.settings;
-  if (!accessToken || !clientId) return;
-  const wanted = [...new Set(logins.map(l => l.toLowerCase()))]
-    .filter(l => l && !avatarCache.has(l))
-    .slice(0, 100);
-  if (!wanted.length) return;
+let avatars = null;
+let avatarTimer = null;
 
-  try {
-    const qs = wanted.map(l => 'login=' + encodeURIComponent(l)).join('&');
-    const res = await fetch('https://api.twitch.tv/helix/users?' + qs, {
-      headers: { 'Client-Id': clientId, Authorization: 'Bearer ' + accessToken }
-    });
-    if (!res.ok) return;
-    const json = await res.json();
-    for (const u of json.data || []) {
-      avatarCache.set(u.login.toLowerCase(), u.profile_image_url);
+/**
+ * Fills in profile pictures for everyone currently listed.
+ *
+ * Debounced because queue changes arrive in bursts (a raid, or Fill Party),
+ * and every lookup is cached, so this settles to zero network traffic once
+ * the regulars are known.
+ */
+function syncAvatars(delay = 250) {
+  if (!avatars) return;
+  clearTimeout(avatarTimer);
+  avatarTimer = setTimeout(async () => {
+    try {
+      const changed = await avatars.apply([store.data.party, store.data.queue]);
+      if (changed) store.changed('avatars');
+    } catch (err) {
+      loginLog('WARN', 'avatar sync failed: ' + err.message);
     }
-    let touched = false;
-    for (const list of [store.data.party, store.data.queue]) {
-      for (const e of list) {
-        const url = avatarCache.get(e.login);
-        if (url && e.avatar !== url) { e.avatar = url; touched = true; }
-      }
-    }
-    if (touched) store.changed('avatars');
-  } catch (_) { /* avatars are cosmetic - never block the queue on them */ }
-}
-
-function applyCachedAvatar(entry) {
-  const url = avatarCache.get(entry.login);
-  if (url) entry.avatar = url;
+  }, delay);
 }
 
 /* --------------------------------------------------------------------- */
@@ -159,8 +148,9 @@ function handleChatMessage(msg) {
     }
     const res = store.addUser(msg, { source: 'chat' });
     if (res.ok) {
-      applyCachedAvatar(res.entry);
-      fetchAvatars([msg.login]);
+      const cached = avatars && avatars.get(msg.login);
+      if (cached) res.entry.avatar = cached;
+      syncAvatars(0);
       pushLog({ type: 'join', text: `${msg.display} joined the queue (#${res.position})` });
       reply(`@${msg.display} you've been added to the queue — you're #${res.position}.`);
     } else if (res.reason === 'already') {
@@ -196,6 +186,14 @@ async function boot() {
   chat = new TwitchChat();
 
   loginLogFile = path.join(app.getPath('userData'), 'login.log');
+  avatars = createAvatarService({
+    cacheFile: path.join(app.getPath('userData'), 'avatars.json'),
+    getAuth: () => ({
+      token: store.data.settings.accessToken,
+      clientId: store.data.settings.clientId
+    }),
+    onLog: pushLog
+  });
   twitchLogin.setLogger(loginLog);
 
   server = createServer({
@@ -220,6 +218,8 @@ async function boot() {
   store.on('change', reason => {
     server.pushState();
     send('state', { ...store.snapshot(), reason, port: server.port });
+    // A queue that gained people may have gained faces to look up.
+    if (reason === 'add' || reason === 'move' || reason === 'fill' || reason === 'next') syncAvatars();
   });
 
   chat.on('message', handleChatMessage);
@@ -250,7 +250,10 @@ async function boot() {
     setTimeout(() => updater.check(false), 400);
   }
 
-  if (store.data.settings.accessToken) setTimeout(() => revalidateToken(), 1500);
+  if (store.data.settings.accessToken) {
+    setTimeout(() => revalidateToken(), 1500);
+    syncAvatars(1200);
+  }
 }
 
 function connectChat() {
@@ -305,6 +308,7 @@ async function storeCredentials(creds) {
   pushLog({ type: 'info', text: `Logged in to Twitch as ${info.login}` });
   send('auth', { ok: true, login: info.login });
   connectChat();
+  syncAvatars(0);   // now that we can authenticate, backfill every face
   return { ok: true, login: info.login };
 }
 
@@ -359,7 +363,10 @@ function fullState() {
 
 ipcMain.handle('app:state', () => fullState());
 ipcMain.handle('update:check', () => updater.check(true));
-ipcMain.handle('update:install', () => updater.install());
+ipcMain.handle('update:install', () => {
+  store.flush();   // an update restarts the app - don't lose the queue
+  return updater.install();
+});
 ipcMain.handle('app:logs', () => logs);
 
 ipcMain.handle('queue:add', (_e, name) => {
@@ -367,8 +374,9 @@ ipcMain.handle('queue:add', (_e, name) => {
   if (!login) return { ok: false };
   const res = store.addUser({ login, display: login }, { source: 'manual' });
   if (res.ok) {
-    applyCachedAvatar(res.entry);
-    fetchAvatars([login.toLowerCase()]);
+    const cached = avatars && avatars.get(login);
+    if (cached) res.entry.avatar = cached;
+    syncAvatars(0);
     pushLog({ type: 'join', text: `${login} added manually (#${res.position})` });
   }
   return res;
@@ -502,7 +510,21 @@ if (!gotLock) {
 
   app.whenReady().then(boot);
 
+  // The queue is the user's data - it must survive every way out of the app.
+  // Saves are debounced, so anything from the last quarter second would
+  // otherwise be lost on exit.
+  let flushed = false;
+  const flushState = () => {
+    if (flushed || !store) return;
+    flushed = true;
+    store.flush();
+  };
+
+  app.on('before-quit', flushState);
+  app.on('will-quit', flushState);
+
   app.on('window-all-closed', () => {
+    flushState();
     if (chat) chat.disconnect(true);
     if (server) server.close();
     app.quit();

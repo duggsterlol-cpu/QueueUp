@@ -10,7 +10,8 @@ const browserGlobals = {
   requestAnimationFrame: 'readonly', WebSocket: 'readonly',
   AbortController: 'readonly', Promise: 'readonly', Symbol: 'readonly',
   URLSearchParams: 'readonly', getComputedStyle: 'readonly',
-  innerWidth: 'readonly', innerHeight: 'readonly'
+  innerWidth: 'readonly', innerHeight: 'readonly',
+  Image: 'readonly', HTMLElement: 'readonly'
 };
 
 const nodeGlobals = {

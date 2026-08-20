@@ -174,6 +174,7 @@ body.highlight.glow .orow.first {
 body.no-rank .rank { display: none; }
 
 .oav {
+  position: relative;
   width: 34px; height: 34px;
   border-radius: 99px;
   display: grid; place-items: center;
@@ -183,7 +184,17 @@ body.no-rank .rank { display: none; }
   flex: none;
   box-shadow: inset 0 0 0 2px rgba(255,255,255,.18);
 }
-.oav img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.oav img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity calc(.3s / var(--speed)) ease;
+}
+.oav img.shown { opacity: 1; }
 body.no-avatar .oav { display: none; }
 
 .oname {

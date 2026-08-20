@@ -90,20 +90,52 @@ function buildRow(entry) {
   const el = document.createElement('div');
   el.className = 'orow enter';
   el.dataset.id = entry.id;
-
-  const hue = hashHue(entry.login || 'x');
-  const avatar = entry.avatar
-    ? `<span class="oav"><img src="${escapeHtml(entry.avatar)}" alt="" /></span>`
-    : `<span class="oav" style="background:linear-gradient(140deg,hsl(${hue} 72% 58%),hsl(${(hue + 42) % 360} 68% 44%))">${escapeHtml((entry.display || '?').charAt(0).toUpperCase())}</span>`;
-
   el.innerHTML = `
     <span class="rank"></span>
-    ${avatar}
+    <span class="oav"></span>
     <span class="oname">${escapeHtml(entry.display)}${entry.isSub ? '<span class="osub">SUB</span>' : ''}</span>
     <span class="otime"></span>
   `;
   el.querySelector('.otime').dataset.since = entry.joinedAt;
+  paintAvatar(el.querySelector('.oav'), entry);
   return el;
+}
+
+/**
+ * Draws the viewer's Twitch picture, falling back to a colour from their name.
+ * Called on every render because the picture is looked up asynchronously and
+ * usually lands a moment after the row appears.
+ */
+function paintAvatar(el, entry) {
+  if (!el) return;
+
+  const hue = hashHue(entry.login || 'x');
+  const tint = `linear-gradient(140deg,hsl(${hue} 72% 58%),hsl(${(hue + 42) % 360} 68% 44%))`;
+  const letter = escapeHtml((entry.display || '?').charAt(0).toUpperCase());
+
+  const drawFallback = () => {
+    if (el.dataset.mode === 'letter') return;
+    el.dataset.mode = 'letter';
+    el.dataset.src = '';
+    el.style.background = tint;
+    el.textContent = letter;
+  };
+
+  if (!entry.avatar) return drawFallback();
+  if (el.dataset.src === entry.avatar) return;
+
+  el.dataset.src = entry.avatar;
+  el.dataset.mode = 'photo';
+  el.style.background = tint;
+  el.textContent = '';
+
+  const img = new Image();
+  img.alt = '';
+  img.decoding = 'async';
+  img.onerror = () => { if (el.dataset.src === entry.avatar) drawFallback(); };
+  img.onload = () => { if (el.dataset.src === entry.avatar) img.classList.add('shown'); };
+  img.src = entry.avatar;
+  el.appendChild(img);
 }
 
 function render() {
@@ -153,6 +185,7 @@ function render() {
     el.style.setProperty('--i', i);
     el.classList.toggle('first', i === 0);
     el.querySelector('.rank').textContent = i + 1;
+    paintAvatar(el.querySelector('.oav'), entry);
     const time = el.querySelector('.otime');
     if (time.dataset.since !== String(entry.joinedAt)) time.dataset.since = entry.joinedAt;
     ordered.push(el);

@@ -64,6 +64,7 @@ function normalizeEntry(e) {
     joinedAt: Number(e.joinedAt) || Date.now(),
     partySince: e.partySince ? Number(e.partySince) : undefined,
     color: e.color || null,
+    avatar: e.avatar || null,
     isSub: !!e.isSub,
     isMod: !!e.isMod,
     isVip: !!e.isVip,
@@ -96,20 +97,48 @@ class Store extends EventEmitter {
         this.data.overlay = { ...DEFAULT_OVERLAY, ...(raw.overlay || {}) };
       }
     } catch (err) {
+      // Never let an unreadable file get silently overwritten by the next
+      // save - move it aside so the queue can still be recovered by hand.
       console.error('[store] failed to load state:', err.message);
+      try {
+        const aside = this.file + '.corrupt';
+        fs.renameSync(this.file, aside);
+        console.error('[store] previous state kept at', aside);
+      } catch (_) { /* nothing more we can do */ }
+    }
+  }
+
+  /**
+   * Writes through a temp file and renames it into place.
+   *
+   * A half-written state file fails to parse on the next launch, which would
+   * look exactly like the queue clearing itself - so the real file is only
+   * ever replaced by a complete one.
+   */
+  writeNow() {
+    clearTimeout(this._saveTimer);
+    this._saveTimer = null;
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      const tmp = this.file + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
+      fs.renameSync(tmp, this.file);
+      return true;
+    } catch (err) {
+      console.error('[store] failed to save state:', err.message);
+      return false;
     }
   }
 
   save() {
     clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(() => {
-      try {
-        fs.mkdirSync(path.dirname(this.file), { recursive: true });
-        fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
-      } catch (err) {
-        console.error('[store] failed to save state:', err.message);
-      }
-    }, 250);
+    this._saveTimer = setTimeout(() => this.writeNow(), 250);
+  }
+
+  /** Forces any pending write out. Call before the app can exit. */
+  flush() {
+    if (this._saveTimer) return this.writeNow();
+    return true;
   }
 
   changed(reason) {

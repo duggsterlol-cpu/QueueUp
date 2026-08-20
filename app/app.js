@@ -113,22 +113,56 @@ function buildRow(entry, list) {
   return row;
 }
 
+/**
+ * Paints a viewer's avatar: their real Twitch picture once we have it,
+ * otherwise a colour derived from their name with their initial.
+ *
+ * The picture can arrive well after the row does, so this is safe to call on
+ * every render and only touches the DOM when something actually changed.
+ */
+function paintAvatar(el, entry) {
+  if (!el) return;
+
+  const letter = (entry.display || entry.login || '?').charAt(0).toUpperCase();
+
+  const drawFallback = () => {
+    if (el.dataset.mode === 'letter') return;
+    el.dataset.mode = 'letter';
+    el.dataset.src = '';
+    el.style.background = avatarStyle(entry.login);
+    el.textContent = letter;
+  };
+
+  if (!entry.avatar) return drawFallback();
+  if (el.dataset.src === entry.avatar) return;
+
+  el.dataset.src = entry.avatar;
+  el.dataset.mode = 'photo';
+  el.style.background = avatarStyle(entry.login);   // shows through until the image decodes
+  el.textContent = '';
+
+  const img = new Image();
+  img.alt = '';
+  img.decoding = 'async';
+  img.className = 'avatar-img';
+  // A dead URL (deleted account, offline) must not leave an empty circle.
+  img.onerror = () => {
+    if (el.dataset.src !== entry.avatar) return;
+    drawFallback();
+  };
+  img.onload = () => {
+    if (el.dataset.src !== entry.avatar) return;
+    img.classList.add('shown');
+  };
+  img.src = entry.avatar;
+  el.appendChild(img);
+}
+
 function updateRow(row, entry, index, list) {
   row.dataset.list = list;
   row.querySelector('.rank').textContent = list === 'queue' ? index + 1 : index + 2;
 
-  const av = row.querySelector('.avatar');
-  if (entry.avatar) {
-    if (av.dataset.src !== entry.avatar) {
-      av.dataset.src = entry.avatar;
-      av.style.background = 'none';
-      av.innerHTML = `<img src="${entry.avatar}" alt="" />`;
-    }
-  } else if (!av.dataset.gen) {
-    av.dataset.gen = '1';
-    av.style.background = avatarStyle(entry.login);
-    av.textContent = (entry.display || entry.login || '?').charAt(0).toUpperCase();
-  }
+  paintAvatar(row.querySelector('.avatar'), entry);
 
   const name = row.querySelector('.p-name');
   const badges = [];
